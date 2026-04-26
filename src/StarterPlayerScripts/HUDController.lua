@@ -304,20 +304,80 @@ local WinnerAnnounce = events:FindFirstChild("Announcement")
 -- We detect winner text inside the existing Announcement handler
 local origAnnouncementHandler = nil -- already connected above
 
--- Hit marker effect
+-- Hit marker effect (any surface) — bigger ball + pulsing PointLight
+local TweenService = game:GetService("TweenService")
+
 events:WaitForChild("WeaponHit").OnClientEvent:Connect(function(position, normal)
-	-- Simple hit spark
 	local spark = Instance.new("Part")
-	spark.Size = Vector3.new(0.3, 0.3, 0.3)
+	spark.Size = Vector3.new(1.2, 1.2, 1.2)
 	spark.Position = position
 	spark.Anchored = true
 	spark.CanCollide = false
-	spark.Color = Color3.fromRGB(255, 200, 100)
+	spark.Color = Color3.fromRGB(255, 220, 120)
 	spark.Material = Enum.Material.Neon
 	spark.Shape = Enum.PartType.Ball
 	spark.Parent = workspace
 
-	task.delay(0.15, function()
-		spark:Destroy()
-	end)
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(255, 200, 100)
+	light.Brightness = 6
+	light.Range = 14
+	light.Parent = spark
+
+	-- Quick fade-and-shrink
+	TweenService:Create(spark, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Size = Vector3.new(0.1, 0.1, 0.1),
+		Transparency = 1,
+	}):Play()
+	TweenService:Create(light, TweenInfo.new(0.25), { Brightness = 0 }):Play()
+
+	task.delay(0.3, function() spark:Destroy() end)
+end)
+
+-- NPC hit: red flash on the body + floating damage number
+events:WaitForChild("NPCDamaged").OnClientEvent:Connect(function(npcModel, damage, hitPos)
+	if not npcModel or not npcModel.Parent then return end
+
+	-- Red highlight pulse
+	local hl = Instance.new("Highlight")
+	hl.FillColor = Color3.fromRGB(255, 60, 40)
+	hl.OutlineColor = Color3.fromRGB(255, 200, 100)
+	hl.FillTransparency = 0.4
+	hl.OutlineTransparency = 0
+	hl.Parent = npcModel
+	task.delay(0.15, function() hl:Destroy() end)
+
+	-- Floating damage number
+	local anchor = Instance.new("Part")
+	anchor.Size = Vector3.new(0.1, 0.1, 0.1)
+	anchor.Position = hitPos + Vector3.new(0, 1, 0)
+	anchor.Anchored = true
+	anchor.CanCollide = false
+	anchor.Transparency = 1
+	anchor.Parent = workspace
+
+	local bb = Instance.new("BillboardGui")
+	bb.Size = UDim2.new(0, 100, 0, 40)
+	bb.AlwaysOnTop = true
+	bb.LightInfluence = 0
+	bb.Parent = anchor
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(1, 0, 1, 0)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = "-" .. damage
+	lbl.TextColor3 = Color3.fromRGB(255, 230, 80)
+	lbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+	lbl.TextStrokeTransparency = 0
+	lbl.TextScaled = true
+	lbl.Font = Enum.Font.GothamBlack
+	lbl.Parent = bb
+
+	-- Float up + fade
+	TweenService:Create(anchor, TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Position = hitPos + Vector3.new(0, 5, 0),
+	}):Play()
+	TweenService:Create(lbl, TweenInfo.new(0.7), {
+		TextTransparency = 1, TextStrokeTransparency = 1,
+	}):Play()
+	task.delay(0.75, function() anchor:Destroy() end)
 end)

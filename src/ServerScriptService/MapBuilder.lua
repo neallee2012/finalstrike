@@ -10,22 +10,24 @@ local MAP = {}
 -- but Brightness/Ambient/Fog stay dark for the cinematic look. NPCs carry their
 -- own red PointLights (see NPCSystem.createR15NPC) so they're visible regardless.
 local function setupAtmosphere()
-	Lighting.Ambient = Color3.fromRGB(30, 25, 35)
-	Lighting.OutdoorAmbient = Color3.fromRGB(40, 35, 45)
-	Lighting.Brightness = 0.5
+	-- Brighter than the original cinematic preset so daytime ClockTime actually
+	-- looks like daytime; still desaturated/contrasted for a "dark thriller" vibe.
+	Lighting.Ambient = Color3.fromRGB(70, 65, 75)
+	Lighting.OutdoorAmbient = Color3.fromRGB(110, 100, 115)
+	Lighting.Brightness = 2
 	local now = os.date("*t")
 	Lighting.ClockTime = now.hour + now.min / 60
-	Lighting.FogEnd = 400
-	Lighting.FogStart = 50
-	Lighting.FogColor = Color3.fromRGB(20, 15, 25)
+	Lighting.FogEnd = 800
+	Lighting.FogStart = 200
+	Lighting.FogColor = Color3.fromRGB(60, 55, 70)
 
 	local atmo = Instance.new("Atmosphere")
-	atmo.Density = 0.35
+	atmo.Density = 0.15
 	atmo.Offset = 0.1
-	atmo.Color = Color3.fromRGB(40, 30, 50)
-	atmo.Decay = Color3.fromRGB(60, 40, 70)
+	atmo.Color = Color3.fromRGB(80, 70, 90)
+	atmo.Decay = Color3.fromRGB(120, 100, 130)
 	atmo.Glare = 0.2
-	atmo.Haze = 3
+	atmo.Haze = 1.5
 	atmo.Parent = Lighting
 
 	local bloom = Instance.new("BloomEffect")
@@ -37,7 +39,7 @@ local function setupAtmosphere()
 	local cc = Instance.new("ColorCorrectionEffect")
 	cc.Contrast = 0.15
 	cc.Saturation = -0.1
-	cc.Brightness = -0.02
+	cc.Brightness = 0
 	cc.TintColor = Color3.fromRGB(255, 240, 245)
 	cc.Parent = Lighting
 end

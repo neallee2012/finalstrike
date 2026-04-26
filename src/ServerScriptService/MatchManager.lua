@@ -347,19 +347,18 @@ events:WaitForChild("FireWeapon").OnServerEvent:Connect(function(player, origin,
 				if hitPlayer then
 					MatchManager.damagePlayer(hitPlayer, config.Damage, player)
 				else
-					-- It's an NPC - let NPCSystem handle
+					-- It's an NPC - let NPCSystem handle death via HP attribute listener
 					local npcHP = hitChar:GetAttribute("HP")
 					if npcHP then
 						npcHP = npcHP - config.Damage
 						hitChar:SetAttribute("HP", npcHP)
-						if npcHP <= 0 then
-							-- NPC death handled by NPCSystem attribute listener
-						end
+						-- Tell clients to flash the NPC and float a damage number
+						events.NPCDamaged:FireAllClients(hitChar, config.Damage, result.Position)
 					end
 				end
 			end
 
-			-- Hit effect
+			-- Generic hit spark (also fires for non-Humanoid hits like cover)
 			events.WeaponHit:FireAllClients(result.Position, result.Normal)
 		end
 	end
