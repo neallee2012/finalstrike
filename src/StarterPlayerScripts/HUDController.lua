@@ -1,5 +1,8 @@
--- HUDController.lua (StarterGui)
--- Client-side HUD: HP bar, ammo, match phase, timer, announcements, kill feed
+-- HUDController.lua (StarterPlayerScripts)
+-- Client-side HUD: HP bar, ammo, match phase, timer, announcements, kill feed.
+-- Lives in StarterPlayerScripts (NOT StarterGui) so it runs once per player session.
+-- Putting it in StarterGui causes a duplicate ScreenGui on every character respawn,
+-- producing overlapping LOBBY/timer text (issue #2).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

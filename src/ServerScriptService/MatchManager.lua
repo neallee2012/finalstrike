@@ -41,6 +41,7 @@ function MatchManager.initPlayerData(player)
 		Coins = 0,
 		Weapon = "Viper",  -- start with pistol
 		Eliminated = false,
+		ProtectedUntil = 0,  -- set after teleportToArena
 	}
 	-- Send initial HP
 	local healthUpdate = events:WaitForChild("HealthUpdate")
@@ -53,10 +54,17 @@ function MatchManager.damagePlayer(player, damage, attacker)
 	local data = playerData[player]
 	if not data or data.Eliminated then return end
 
+	local isPlayerAttacker = attacker and attacker:IsA("Player")
+
 	-- Check PvP rules
-	if attacker and attacker:IsA("Player") then
+	if isPlayerAttacker then
 		if not MatchManager.PvPEnabled then
 			return  -- PvP not active, no player damage
+		end
+	else
+		-- NPC / environmental damage — honour spawn protection window
+		if data.ProtectedUntil and tick() < data.ProtectedUntil then
+			return
 		end
 	end
 
@@ -224,6 +232,13 @@ function MatchManager.startMatch()
 
 	-- Teleport to arena
 	MatchManager.teleportToArena()
+	-- Grant spawn protection so NPCs can't gank players the instant they land
+	local protectionEnd = tick() + GameConfig.SPAWN_PROTECTION
+	for _, p in ipairs(Players:GetPlayers()) do
+		local d = playerData[p]
+		if d then d.ProtectedUntil = protectionEnd end
+	end
+	Announcement:FireAllClients(string.format("SPAWN PROTECTION %ds", GameConfig.SPAWN_PROTECTION))
 	task.wait(1)
 	MatchManager.broadcastAliveCount()
 

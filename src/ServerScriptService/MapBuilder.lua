@@ -5,12 +5,16 @@ local Lighting = game:GetService("Lighting")
 
 local MAP = {}
 
--- Atmosphere setup: dark, cinematic, foggy with red accents
+-- Atmosphere setup: dark, cinematic, foggy with red accents.
+-- ClockTime tracks the real wall-clock so the sky reflects when you're playing,
+-- but Brightness/Ambient/Fog stay dark for the cinematic look. NPCs carry their
+-- own red PointLights (see NPCSystem.createR15NPC) so they're visible regardless.
 local function setupAtmosphere()
 	Lighting.Ambient = Color3.fromRGB(30, 25, 35)
 	Lighting.OutdoorAmbient = Color3.fromRGB(40, 35, 45)
 	Lighting.Brightness = 0.5
-	Lighting.ClockTime = 21  -- night
+	local now = os.date("*t")
+	Lighting.ClockTime = now.hour + now.min / 60
 	Lighting.FogEnd = 400
 	Lighting.FogStart = 50
 	Lighting.FogColor = Color3.fromRGB(20, 15, 25)
@@ -294,17 +298,19 @@ function MAP.buildArena(parent)
 	npcSpawns.Name = "NPCSpawns"
 	npcSpawns.Parent = arena
 
+	-- All NPC spawns kept at z <= -400 so even with wander + DetectRange they
+	-- can't reach players (z=-270~-290) within the first 5–8 seconds.
+	-- Combined with MatchManager.SPAWN_PROTECTION grace this prevents instant ganks.
 	local spawnPositions = {
-		{ Type = "Patrol", Pos = Vector3.new(50, 1, -360) },
+		{ Type = "Patrol", Pos = Vector3.new(50, 1, -420) },
 		{ Type = "Patrol", Pos = Vector3.new(-70, 1, -440) },
 		{ Type = "Patrol", Pos = Vector3.new(90, 1, -480) },
-		{ Type = "Patrol", Pos = Vector3.new(-30, 1, -350) },
 		{ Type = "Patrol", Pos = Vector3.new(20, 1, -520) },
-		{ Type = "Armored", Pos = Vector3.new(0, 1, -400) },
+		{ Type = "Armored", Pos = Vector3.new(0, 1, -460) },
 		{ Type = "Armored", Pos = Vector3.new(-100, 1, -470) },
-		{ Type = "Armored", Pos = Vector3.new(80, 1, -350) },
-		{ Type = "Elite", Pos = Vector3.new(0, 1, -450) },
-		{ Type = "Elite", Pos = Vector3.new(-50, 7, -400) },  -- on platform
+		{ Type = "Armored", Pos = Vector3.new(80, 1, -410) },
+		{ Type = "Elite", Pos = Vector3.new(0, 1, -510) },
+		{ Type = "Elite", Pos = Vector3.new(-50, 7, -440) },  -- on platform
 	}
 
 	for i, s in ipairs(spawnPositions) do
@@ -465,10 +471,13 @@ end
 function MAP.buildAll()
 	setupAtmosphere()
 
-	-- Remove Studio's default Baseplate (2048×16×2048 at y=-8) — its top at y=0
-	-- intercepts raycasts that traverse the lobby↔arena gap.
-	local defaultBaseplate = workspace:FindFirstChild("Baseplate")
-	if defaultBaseplate then defaultBaseplate:Destroy() end
+	-- Remove Studio's default template instances. Baseplate's top at y=0
+	-- intercepts raycasts that traverse the lobby↔arena gap; default
+	-- SpawnLocation competes with our LobbySpawn for first-spawn placement.
+	for _, name in ipairs({ "Baseplate", "SpawnLocation" }) do
+		local default = workspace:FindFirstChild(name)
+		if default then default:Destroy() end
+	end
 
 	local mapFolder = Instance.new("Folder")
 	mapFolder.Name = "LastZone"

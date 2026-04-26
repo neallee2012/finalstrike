@@ -9,6 +9,7 @@ GameConfig.MAX_PLAYERS = 12
 GameConfig.PVE_DURATION = 180       -- seconds
 GameConfig.PVP_COUNTDOWN = 10       -- seconds
 GameConfig.LOBBY_COUNTDOWN = 10     -- seconds before match starts
+GameConfig.SPAWN_PROTECTION = 3     -- seconds of NPC-damage immunity after teleport to arena
 
 -- Player settings
 GameConfig.MAX_HP = 100

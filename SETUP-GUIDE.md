@@ -129,9 +129,8 @@ final-strike/
     │   └── PlayerHealth.lua
     ├── ServerStorage/
     │   └── WeaponSystem.lua
-    ├── StarterGui/
-    │   └── HUDController.lua
     └── StarterPlayerScripts/
+        ├── HUDController.lua  ← 持久化 HUD（不放 StarterGui，避免重生時 clone）
         └── WeaponClient.lua
 ```
 
@@ -165,6 +164,5 @@ PvE 蒐集階段 → PvP 淘汰賽。
 - ServerScriptService: MatchManager, NPCSystem, LootSystem, PlayerHealth, MapBuilder
 - ReplicatedStorage: GameConfig (ModuleScript). GameEvents Folder 由 ServerScriptService.GameEventsBootstrap 在 runtime 建立
 - ServerStorage: WeaponSystem (ModuleScript)
-- StarterGui: HUDController (LocalScript)
-- StarterPlayerScripts: WeaponClient (LocalScript)
+- StarterPlayerScripts: HUDController, WeaponClient (LocalScripts)
 ```

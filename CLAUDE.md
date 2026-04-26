@@ -102,7 +102,7 @@ PvE 蒐集階段 (180秒) → PvP 淘汰賽 → 最後存活者獲勝。
 | GameConfig | ReplicatedStorage | ModuleScript | 全域設定 |
 | GameEvents | ReplicatedStorage | Folder (runtime) | 由 GameEventsBootstrap 建立，內含所有 RemoteEvent |
 | WeaponSystem | ServerStorage | ModuleScript | 武器數據 |
-| HUDController | StarterGui | LocalScript | UI |
+| HUDController | StarterPlayerScripts | LocalScript | UI（放此處避免每次重生 clone 一份新 ScreenGui，issue #2）|
 | WeaponClient | StarterPlayerScripts | LocalScript | 射擊輸入 |
 
 ## 比賽階段
@@ -141,3 +141,4 @@ _隨開發進度持續更新_
 - ReplicatedStorage 的 Script 預設 RunContext=Legacy 不會自動執行；bootstrap 腳本放 ServerScriptService 比較安全
 - Bootstrap script 不可與它在 runtime 建立的物件同名 — `WaitForChild` 會回傳第一個（通常是 Script），下游路徑全錯。慣例：`<Name>Bootstrap`
 - `execute_luau` 在 playtest 是 client context — 看不到 ServerScriptService 子物件、`_G` 也是 client 的；驗證 server 狀態靠 `print` + `console_output`，或檢查 ReplicatedStorage 共享物件
+- 持久化 HUD/UI：LocalScript 放 StarterPlayerScripts（每個玩家只跑一次），不要放 StarterGui（每次重生 clone 一份）。ScreenGui 也要 `ResetOnSpawn = false`

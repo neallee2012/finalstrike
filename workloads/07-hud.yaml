@@ -19,7 +19,8 @@ success_criteria:
   - Kill Feed 5 秒後消失
   - 勝利者金色大字 6 秒後淡出
 artifacts:
-  - src/StarterGui/HUDController.lua
+  - src/StarterPlayerScripts/HUDController.lua
 recovery:
   - UI 重生後消失 → 確認 ResetOnSpawn=false
   - 事件不觸發 → 確認 GameEvents 裡有對應 RemoteEvent
+  - 重生後出現多份重疊 UI → LocalScript 必須在 StarterPlayerScripts 而非 StarterGui (issue #2)

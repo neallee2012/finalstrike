@@ -8,8 +8,7 @@ A 12-player survival shooter for Roblox. PvE loot phase → PvP elimination.
 2. Set Avatar Type to **R15** (Game Settings → Avatar → Avatar Type → R15)
 3. Copy each `.lua` file into the corresponding Roblox service:
    - `src/ServerScriptService/` → ServerScriptService
-   - `src/StarterGui/` → StarterGui
-   - `src/StarterPlayerScripts/` → StarterPlayerScripts
+   - `src/StarterPlayerScripts/` → StarterPlayer.StarterPlayerScripts
    - `src/ReplicatedStorage/` → ReplicatedStorage
    - `src/ServerStorage/` → ServerStorage
 4. Run `MapBuilder` first (it auto-runs on server start to generate the map)

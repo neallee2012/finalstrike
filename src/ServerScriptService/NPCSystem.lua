@@ -4,12 +4,25 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local PathfindingService = game:GetService("PathfindingService")
 
 local GameConfig = require(ReplicatedStorage:WaitForChild("GameConfig"))
 local events = ReplicatedStorage:WaitForChild("GameEvents")
 
 local NPCSystem = {}
 local activeNPCs = {}
+
+-- Path agent parameters tuned for our R15 NPC (HipHeight 3.5, ~2 stud wide, ~5 tall)
+local PATH_AGENT = {
+	AgentRadius = 2,
+	AgentHeight = 5,
+	AgentCanJump = true,
+	AgentJumpHeight = 7,
+	AgentMaxSlope = 45,
+}
+local PATH_RECOMPUTE_DIST = 8     -- recompute when target moves this far
+local PATH_RECOMPUTE_INTERVAL = 1.5 -- or after this many seconds
+local WAYPOINT_REACHED_DIST = 4   -- advance to next waypoint within this distance
 
 -- Build R15 NPC model from scratch
 local function createR15NPC(enemyType, position)
@@ -67,6 +80,16 @@ local function createR15NPC(enemyType, position)
 	end
 
 	model.PrimaryPart = model:FindFirstChild("HumanoidRootPart")
+
+	-- Red glow on chest so NPCs are visible against the dark cinematic backdrop.
+	-- Elite gets a brighter, longer-range light to telegraph priority threat.
+	local glow = Instance.new("PointLight")
+	glow.Name = "ThreatGlow"
+	glow.Color = Color3.fromRGB(255, 40, 30)
+	glow.Brightness = enemyType == "Elite" and 4 or 2
+	glow.Range = enemyType == "Elite" and 22 or 14
+	glow.Shadows = true
+	glow.Parent = model:FindFirstChild("UpperTorso")
 
 	-- Humanoid (R15 rig type)
 	-- HipHeight = (HRP local Y) - (Foot local Y) + (foot half-height)
@@ -229,6 +252,46 @@ local function runNPCAI(npcModel)
 	local lastAttack = 0
 	local patrolTarget = nil
 
+	-- Pathfinding state for Chase mode
+	local path = PathfindingService:CreatePath(PATH_AGENT)
+	local waypoints, waypointIndex = nil, 1
+	local lastTargetPos, lastComputeTime = nil, 0
+
+	local function chaseWithPath(root, targetPos)
+		local now = tick()
+		local needRecompute = (not waypoints) or (not lastTargetPos)
+			or (lastTargetPos - targetPos).Magnitude > PATH_RECOMPUTE_DIST
+			or (now - lastComputeTime) > PATH_RECOMPUTE_INTERVAL
+		if needRecompute then
+			local ok = pcall(function() path:ComputeAsync(root.Position, targetPos) end)
+			if ok and path.Status == Enum.PathStatus.Success then
+				waypoints = path:GetWaypoints()
+				waypointIndex = 1
+				lastTargetPos = targetPos
+				lastComputeTime = now
+			else
+				waypoints = nil  -- fall back to direct MoveTo
+			end
+		end
+		if waypoints and waypointIndex <= #waypoints then
+			local wp = waypoints[waypointIndex]
+			if (root.Position - wp.Position).Magnitude < WAYPOINT_REACHED_DIST then
+				waypointIndex = waypointIndex + 1
+				if waypointIndex > #waypoints then
+					humanoid:MoveTo(targetPos)
+					return
+				end
+				wp = waypoints[waypointIndex]
+			end
+			if wp.Action == Enum.PathWaypointAction.Jump then
+				humanoid.Jump = true
+			end
+			humanoid:MoveTo(wp.Position)
+		else
+			humanoid:MoveTo(targetPos)  -- pathfinding failed, just charge
+		end
+	end
+
 	-- Listen for HP changes (damage from weapons)
 	npcModel:GetAttributeChangedSignal("HP"):Connect(function()
 		local hp = npcModel:GetAttribute("HP")
@@ -297,10 +360,10 @@ local function runNPCAI(npcModel)
 					end
 				end
 			else
-				-- Chase
+				-- Chase via PathfindingService so NPCs route around cover
 				npcModel:SetAttribute("State", "Chase")
 				local targetPos = closestPlayer.Character.HumanoidRootPart.Position
-				humanoid:MoveTo(targetPos)
+				chaseWithPath(root, targetPos)
 			end
 		else
 			-- Patrol
