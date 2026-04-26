@@ -69,40 +69,55 @@ local function createR15NPC(enemyType, position)
 	model.PrimaryPart = model:FindFirstChild("HumanoidRootPart")
 
 	-- Humanoid (R15 rig type)
+	-- HipHeight = (HRP local Y) - (Foot local Y) + (foot half-height)
+	--           = 3 - (-0.35) + 0.15 = 3.5
+	-- Without this, HRP rests on floor and feet sink ~2.35 below ground.
 	local humanoid = Instance.new("Humanoid")
 	humanoid.RigType = Enum.HumanoidRigType.R15
+	humanoid.HipHeight = 3.5
 	humanoid.MaxHealth = config.HP
 	humanoid.Health = config.HP
 	humanoid.WalkSpeed = config.Speed
 	humanoid.Parent = model
 
-	-- Motor6D joints for R15
+	-- Motor6D joints for R15.
+	-- Parent = closer-to-root body part, Child = further. Joint forces:
+	--   Child.CFrame = Parent.CFrame * C0 * C1:Inverse()
+	-- Convention: C0 = (Child - Parent) translation in Parent's local space, C1 = identity.
+	-- partDefs.Pos values (in spawn-local space, treating spawn as origin) drive these C0s.
 	local joints = {
-		{ Part0 = "LowerTorso", Part1 = "HumanoidRootPart", Name = "Root", C0 = CFrame.new(0, 0, 0), C1 = CFrame.new(0, -0.2, 0) },
-		{ Part0 = "UpperTorso", Part1 = "LowerTorso", Name = "Waist", C0 = CFrame.new(0, 0.8, 0), C1 = CFrame.new(0, -0.2, 0) },
-		{ Part0 = "Head", Part1 = "UpperTorso", Name = "Neck", C0 = CFrame.new(0, 0.6, 0), C1 = CFrame.new(0, 0.8, 0) },
-		{ Part0 = "LeftUpperArm", Part1 = "UpperTorso", Name = "LeftShoulder", C0 = CFrame.new(0.5, 0.6, 0), C1 = CFrame.new(-1, 0.6, 0) },
-		{ Part0 = "LeftLowerArm", Part1 = "LeftUpperArm", Name = "LeftElbow", C0 = CFrame.new(0, 0.6, 0), C1 = CFrame.new(0, -0.6, 0) },
-		{ Part0 = "LeftHand", Part1 = "LeftLowerArm", Name = "LeftWrist", C0 = CFrame.new(0, 0.15, 0), C1 = CFrame.new(0, -0.6, 0) },
-		{ Part0 = "RightUpperArm", Part1 = "UpperTorso", Name = "RightShoulder", C0 = CFrame.new(-0.5, 0.6, 0), C1 = CFrame.new(1, 0.6, 0) },
-		{ Part0 = "RightLowerArm", Part1 = "RightUpperArm", Name = "RightElbow", C0 = CFrame.new(0, 0.6, 0), C1 = CFrame.new(0, -0.6, 0) },
-		{ Part0 = "RightHand", Part1 = "RightLowerArm", Name = "RightWrist", C0 = CFrame.new(0, 0.15, 0), C1 = CFrame.new(0, -0.6, 0) },
-		{ Part0 = "LeftUpperLeg", Part1 = "LowerTorso", Name = "LeftHip", C0 = CFrame.new(0, 0.65, 0), C1 = CFrame.new(-0.5, -0.2, 0) },
-		{ Part0 = "LeftLowerLeg", Part1 = "LeftUpperLeg", Name = "LeftKnee", C0 = CFrame.new(0, 0.65, 0), C1 = CFrame.new(0, -0.65, 0) },
-		{ Part0 = "LeftFoot", Part1 = "LeftLowerLeg", Name = "LeftAnkle", C0 = CFrame.new(0, 0.15, 0), C1 = CFrame.new(0, -0.65, 0) },
-		{ Part0 = "RightUpperLeg", Part1 = "LowerTorso", Name = "RightHip", C0 = CFrame.new(0, 0.65, 0), C1 = CFrame.new(0.5, -0.2, 0) },
-		{ Part0 = "RightLowerLeg", Part1 = "RightUpperLeg", Name = "RightKnee", C0 = CFrame.new(0, 0.65, 0), C1 = CFrame.new(0, -0.65, 0) },
-		{ Part0 = "RightFoot", Part1 = "RightLowerLeg", Name = "RightAnkle", C0 = CFrame.new(0, 0.15, 0), C1 = CFrame.new(0, -0.65, 0) },
+		-- Spine
+		{ Name = "Root",          Parent = "HumanoidRootPart", Child = "LowerTorso",   C0 = CFrame.new(0,   -0.2, 0) },
+		{ Name = "Waist",         Parent = "LowerTorso",       Child = "UpperTorso",   C0 = CFrame.new(0,    1.0, 0) },
+		{ Name = "Neck",          Parent = "UpperTorso",       Child = "Head",         C0 = CFrame.new(0,    1.0, 0) },
+		-- Left leg
+		{ Name = "LeftHip",       Parent = "LowerTorso",       Child = "LeftUpperLeg", C0 = CFrame.new(-0.5, -1.15, 0) },
+		{ Name = "LeftKnee",      Parent = "LeftUpperLeg",     Child = "LeftLowerLeg", C0 = CFrame.new(0,   -1.3, 0) },
+		{ Name = "LeftAnkle",     Parent = "LeftLowerLeg",     Child = "LeftFoot",     C0 = CFrame.new(0,   -0.7, 0) },
+		-- Right leg
+		{ Name = "RightHip",      Parent = "LowerTorso",       Child = "RightUpperLeg",C0 = CFrame.new(0.5, -1.15, 0) },
+		{ Name = "RightKnee",     Parent = "RightUpperLeg",    Child = "RightLowerLeg",C0 = CFrame.new(0,   -1.3, 0) },
+		{ Name = "RightAnkle",    Parent = "RightLowerLeg",    Child = "RightFoot",    C0 = CFrame.new(0,   -0.7, 0) },
+		-- Left arm
+		{ Name = "LeftShoulder",  Parent = "UpperTorso",       Child = "LeftUpperArm", C0 = CFrame.new(-1.5, 0,   0) },
+		{ Name = "LeftElbow",     Parent = "LeftUpperArm",     Child = "LeftLowerArm", C0 = CFrame.new(0,   -1.2, 0) },
+		{ Name = "LeftWrist",     Parent = "LeftLowerArm",     Child = "LeftHand",     C0 = CFrame.new(0,   -0.75,0) },
+		-- Right arm
+		{ Name = "RightShoulder", Parent = "UpperTorso",       Child = "RightUpperArm",C0 = CFrame.new(1.5,  0,   0) },
+		{ Name = "RightElbow",    Parent = "RightUpperArm",    Child = "RightLowerArm",C0 = CFrame.new(0,   -1.2, 0) },
+		{ Name = "RightWrist",    Parent = "RightLowerArm",    Child = "RightHand",    C0 = CFrame.new(0,   -0.75,0) },
 	}
 
 	for _, j in ipairs(joints) do
+		local parentPart = model:FindFirstChild(j.Parent)
+		local childPart = model:FindFirstChild(j.Child)
 		local motor = Instance.new("Motor6D")
 		motor.Name = j.Name
-		motor.Part0 = model:FindFirstChild(j.Part1)
-		motor.Part1 = model:FindFirstChild(j.Part0)
+		motor.Part0 = parentPart
+		motor.Part1 = childPart
 		motor.C0 = j.C0
-		motor.C1 = j.C1
-		motor.Parent = model:FindFirstChild(j.Part0)
+		motor.C1 = CFrame.new()  -- identity
+		motor.Parent = childPart
 	end
 
 	-- Set attributes

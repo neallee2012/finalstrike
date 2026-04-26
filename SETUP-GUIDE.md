@@ -119,9 +119,9 @@ final-strike/
 ├── CLAUDE.md              ← Claude Code 專案指引
 └── src/                   ← 參考原始碼（已經幫你建好）
     ├── ReplicatedStorage/
-    │   ├── GameConfig.lua
-    │   └── GameEvents.lua
+    │   └── GameConfig.lua
     ├── ServerScriptService/
+    │   ├── GameEventsBootstrap.lua  ← runtime 建立 ReplicatedStorage.GameEvents Folder
     │   ├── MapBuilder.lua
     │   ├── MatchManager.lua
     │   ├── NPCSystem.lua
@@ -163,7 +163,7 @@ PvE 蒐集階段 → PvP 淘汰賽。
 
 ## 腳本位置
 - ServerScriptService: MatchManager, NPCSystem, LootSystem, PlayerHealth, MapBuilder
-- ReplicatedStorage: GameConfig (ModuleScript), GameEvents
+- ReplicatedStorage: GameConfig (ModuleScript). GameEvents Folder 由 ServerScriptService.GameEventsBootstrap 在 runtime 建立
 - ServerStorage: WeaponSystem (ModuleScript)
 - StarterGui: HUDController (LocalScript)
 - StarterPlayerScripts: WeaponClient (LocalScript)

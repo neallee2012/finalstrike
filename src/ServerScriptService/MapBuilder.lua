@@ -465,6 +465,11 @@ end
 function MAP.buildAll()
 	setupAtmosphere()
 
+	-- Remove Studio's default Baseplate (2048×16×2048 at y=-8) — its top at y=0
+	-- intercepts raycasts that traverse the lobby↔arena gap.
+	local defaultBaseplate = workspace:FindFirstChild("Baseplate")
+	if defaultBaseplate then defaultBaseplate:Destroy() end
+
 	local mapFolder = Instance.new("Folder")
 	mapFolder.Name = "LastZone"
 	mapFolder.Parent = workspace

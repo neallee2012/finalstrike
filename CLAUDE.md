@@ -98,8 +98,9 @@ PvE 蒐集階段 (180秒) → PvP 淘汰賽 → 最後存活者獲勝。
 | LootSystem | ServerScriptService | Script | 戰利品生成拾取 |
 | PlayerHealth | ServerScriptService | ModuleScript | 血量 API |
 | MapBuilder | ServerScriptService | Script | 地圖生成 |
+| GameEventsBootstrap | ServerScriptService | Script | runtime 建立 ReplicatedStorage.GameEvents Folder + RemoteEvents |
 | GameConfig | ReplicatedStorage | ModuleScript | 全域設定 |
-| GameEvents | ReplicatedStorage | Script | RemoteEvent |
+| GameEvents | ReplicatedStorage | Folder (runtime) | 由 GameEventsBootstrap 建立，內含所有 RemoteEvent |
 | WeaponSystem | ServerStorage | ModuleScript | 武器數據 |
 | HUDController | StarterGui | LocalScript | UI |
 | WeaponClient | StarterPlayerScripts | LocalScript | 射擊輸入 |
@@ -137,3 +138,6 @@ _隨開發進度持續更新_
 - Touched event 需要 CanCollide=false 的 Part 才穩定觸發
 - 全自動武器用 RunService.Heartbeat 而非 while loop
 - 官方 MCP 工具名稱與社群版不同，以官方文件為準
+- ReplicatedStorage 的 Script 預設 RunContext=Legacy 不會自動執行；bootstrap 腳本放 ServerScriptService 比較安全
+- Bootstrap script 不可與它在 runtime 建立的物件同名 — `WaitForChild` 會回傳第一個（通常是 Script），下游路徑全錯。慣例：`<Name>Bootstrap`
+- `execute_luau` 在 playtest 是 client context — 看不到 ServerScriptService 子物件、`_G` 也是 client 的；驗證 server 狀態靠 `print` + `console_output`，或檢查 ReplicatedStorage 共享物件

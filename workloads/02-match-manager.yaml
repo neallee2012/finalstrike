@@ -19,7 +19,7 @@ success_criteria:
 artifacts:
   - src/ServerScriptService/MatchManager.lua
   - src/ReplicatedStorage/GameConfig.lua
-  - src/ReplicatedStorage/GameEvents.lua
+  - src/ServerScriptService/GameEventsBootstrap.lua
 recovery:
   - 多人同時踩啟動台重複觸發 → 加 MatchRunning guard
   - 斷線玩家未清理 → PlayerRemoving 事件處理
