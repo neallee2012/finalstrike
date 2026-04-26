@@ -135,36 +135,60 @@ Work Items:
                src/*.lua       Studio Output    Receipt ✓/✗
 ```
 
-#### Claude Code + MCP 的執行流程
+#### Roblox 官方 MCP 工具對應五層架構
+
+官方 MCP server 內建在 Studio 中（`rbxmcp`），透過 stdio 與 Claude Code 通訊。
+啟用方式：Studio → View → Assistant → `…` → Manage MCP Servers → Enable Studio as MCP server
+
+| Peter Pang 層 | MCP 工具 | 用途 |
+|---|---|---|
+| **Plan** | `search_game_tree` | 探索現有遊戲結構，了解要改什麼 |
+| **Plan** | `inspect_instance` | 檢查物件屬性，確認需求 gap |
+| **Execute** | `multi_edit` | 寫入/修改腳本（不存在則自動建立） |
+| **Execute** | `execute_luau` | 直接在 Studio 跑 Luau 代碼 |
+| **Execute** | `generate_mesh` | AI 生成 3D 模型（⭐ 官方獨家） |
+| **Execute** | `generate_material` | AI 生成材質/紋理（⭐ 官方獨家） |
+| **Execute** | `insert_from_creator_store` | 從商店拉資產進專案 |
+| **Verify** | `start_stop_play` | 開始/停止 Playtest |
+| **Verify** | `console_output` | 取得 Output 日誌，抓錯誤 |
+| **Verify** | `simulate_input` | 模擬玩家輸入測試互動（⭐ 官方獨家） |
+| **Verify** | `script_grep` | 搜尋所有腳本中的模式 |
+| **Learn** | `script_read` | 讀取腳本回顧修改結果 |
+
+#### Claude Code + 官方 MCP 的執行流程
 
 ```bash
-# 1. CLAIM: AI 確認要做什麼
-claude> "讀取 workloads/weapon-system.yaml，開始 WeaponSystem"
+# 1. CLAIM: 探索現狀，確認要做什麼
+claude> search_game_tree(query="ServerScriptService")  # 看當前結構
+claude> inspect_instance(path="ServerScriptService")    # 檢查細節
 
 # 2. WRITE: 透過 MCP 寫入 Studio
-claude> get_file_tree                    # 看當前結構
-claude> create_script ServerScriptService MatchManager Script "..."  # 寫入
-claude> update_script_source ...         # 修改
+claude> multi_edit(script="ServerScriptService.MatchManager", ...)  # 寫入/修改
+claude> execute_luau(code="print('test')")              # 快速驗證邏輯
+claude> generate_mesh(prompt="dark concrete wall")      # AI 生成 3D 資產
+claude> generate_material(prompt="rusty metal floor")   # AI 生成材質
 
 # 3. TEST: 透過 MCP 測試
-claude> start_playtest                   # 開始測試
-claude> get_playtest_output              # 看 Output 錯誤
-claude> stop_playtest                    # 停止
+claude> start_stop_play(action="start")                 # 開始 Playtest
+claude> console_output()                                # 看 Output 錯誤
+claude> simulate_input(action="move", direction="forward")  # 模擬玩家行為
+claude> start_stop_play(action="stop")                  # 停止
 
 # 4. VERIFY: 檢查是否符合 contract
-claude> grep_scripts "Damage"            # 確認傷害邏輯
-claude> get_instance_properties ...      # 確認物件屬性
+claude> script_grep(pattern="Damage")                   # 確認傷害邏輯
+claude> inspect_instance(path="Workspace.LastZone")     # 確認地圖結構
 ```
 
 #### 失敗處理（Recovery Path = Happy Path 同等重要）
 
-| 失敗情境 | Recovery |
+| 失敗情境 | MCP Recovery 路徑 |
 |----------|----------|
-| Script error on playtest | `get_playtest_output` → 讀錯誤 → 修復 → 重測 |
-| NPC 不動 | 檢查 Humanoid:MoveTo 呼叫 → 確認 R15 骨架完整 |
-| 武器不造成傷害 | 檢查 RemoteEvent 是否建立 → Raycast 參數 |
-| UI 不顯示 | 確認 LocalScript 在 StarterGui → ScreenGui 層級 |
-| MCP 連不上 Studio | 確認 Plugin 安裝 → HTTP Requests 開啟 |
+| Script error on playtest | `console_output` → 讀錯誤 → `multi_edit` 修復 → `start_stop_play` 重測 |
+| NPC 不動 | `execute_luau` 檢查 Humanoid 狀態 → `inspect_instance` 確認 R15 骨架 |
+| 武器不造成傷害 | `script_grep("RemoteEvent")` 確認事件連線 → `script_read` 查 Raycast 參數 |
+| UI 不顯示 | `search_game_tree(query="StarterGui")` 確認 LocalScript 層級 |
+| MCP 連不上 Studio | 確認 Studio → Assistant → MCP Server 已啟用 |
+| 3D 模型品質不佳 | `generate_mesh` 調整 prompt → 重新生成 |
 
 ---
 
@@ -249,14 +273,18 @@ recovery_hints:
   │ 拆解成 workload contract
   │ 產生 Sprint plan
   ▼
-Claude Code + Roblox MCP ◄──── robloxstudio-mcp (npm)
-  │                                    │
-  │ MCP tools                          │ HTTP :3002
-  │ (43 tools)                         │
-  ▼                                    ▼
-Roblox Studio ◄─────────────── Studio Plugin (.rbxm)
+Claude Code + Roblox 官方 MCP
   │
-  │ Playtest
+  │ stdio (rbxmcp)
+  │
+  ▼
+Roblox Studio（內建 MCP server）
+  │
+  │ • multi_edit 寫腳本
+  │ • generate_mesh / generate_material 生成資產
+  │ • execute_luau 執行代碼
+  │ • start_stop_play + console_output 測試
+  │ • simulate_input 模擬玩家
   ▼
 遊戲測試 → Receipt → Learn → 下一個 Sprint
 ```
