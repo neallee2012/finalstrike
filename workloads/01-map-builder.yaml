@@ -1,0 +1,22 @@
+name: MapBuilder
+owner: claude-code
+priority: P0-prototype
+status: ✅ DONE (Sprint 1)
+stages:
+  - define: 地圖結構設計 (Last Zone)
+  - implement: 大廳 + 啟動台
+  - implement: 競技場 + 掩體 + 高台
+  - implement: 觀戰區 + 練習靶
+  - implement: 燈光氛圍 (夜間/紅光/霧氣/Bloom)
+  - verify: 進入 Studio → Play → 大廳走動 → 踩啟動台傳送
+success_criteria:
+  - 大廳有 FINAL STRIKE 標題牌
+  - 啟動台可觸發（1人測試）
+  - 競技場有 12+ 掩體
+  - 觀戰區有 4 個練習靶
+  - 夜間氛圍 + 紅色警示燈 + 霧氣
+artifacts:
+  - src/ServerScriptService/MapBuilder.lua
+recovery:
+  - 燈光太暗 → 調 Lighting.Brightness / Ambient
+  - 掩體穿模 → 確認 Anchored=true + 位置不重疊

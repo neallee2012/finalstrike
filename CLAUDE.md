@@ -14,12 +14,15 @@ PvE 蒐集階段 (180秒) → PvP 淘汰賽 → 最後存活者獲勝。
 - 使用 ModuleScript 做共用邏輯
 - 地圖名稱: "Last Zone"
 
-## MCP 工作流程
-1. 先用 `get_file_tree` 了解當前 Studio 結構
-2. 用 `create_script` / `update_script_source` 寫入或修改程式碼
-3. 修改後用 `start_playtest` 測試
-4. 用 `get_playtest_output` 檢查錯誤
-5. 有問題就用 `grep_scripts` 搜尋相關程式碼
+## MCP 工作流程（Roblox 官方 MCP）
+1. 先用 `search_game_tree` 了解當前 Studio 結構
+2. 用 `multi_edit` 寫入或修改腳本（不存在則自動建立）
+3. 用 `execute_luau` 快速驗證邏輯片段
+4. 修改後用 `start_stop_play` 測試
+5. 用 `console_output` 檢查錯誤
+6. 用 `script_grep` 搜尋相關程式碼
+7. 用 `generate_mesh` / `generate_material` 生成 3D 資產
+8. 用 `user_keyboard_input` / `user_mouse_input` 模擬玩家操作
 
 ## 腳本位置對照表
 | 腳本 | Service | 類型 | 職責 |
@@ -54,3 +57,17 @@ PvE 蒐集階段 (180秒) → PvP 淘汰賽 → 最後存活者獲勝。
 - Patrol: 60 HP, 低傷害, 基本戰利品
 - Armored: 150 HP, 慢速, 好戰利品
 - Elite: 250 HP, 快速強力, 最好戰利品
+
+## Workload Contracts
+見 `workloads/` 目錄，每個系統有對應的 YAML contract。
+
+## Lessons Learned
+_隨開發進度持續更新_
+
+- R15 NPC 需要完整 Motor6D joints 才能 MoveTo
+- Roblox Raycast 的 FilterType 要用 Exclude 而非 Include
+- RemoteEvent 必須先在 ReplicatedStorage 建立，client 才能 WaitForChild
+- ScreenGui.ResetOnSpawn = false 才不會每次重生丟失 UI
+- Touched event 需要 CanCollide=false 的 Part 才穩定觸發
+- 全自動武器用 RunService.Heartbeat 而非 while loop
+- 官方 MCP 工具名稱與社群版不同，以官方文件為準

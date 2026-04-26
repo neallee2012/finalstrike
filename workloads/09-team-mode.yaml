@@ -1,0 +1,18 @@
+name: TeamMode
+owner: TBD
+priority: P3-future
+status: ⏳ NOT STARTED
+stages:
+  - define: 隊伍分組邏輯
+  - implement: 隊伍 UI + 隊友標記
+  - implement: 友軍傷害關閉
+  - implement: 隊伍勝利判定
+  - verify: 2v2 或 3v3 測試
+success_criteria:
+  - 可選單人/隊伍模式
+  - 隊友有標記不會誤傷
+  - 最後存活隊伍獲勝
+artifacts:
+  - TBD
+dependencies:
+  - MatchManager

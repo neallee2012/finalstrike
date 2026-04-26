@@ -1,0 +1,17 @@
+name: SpectatorArea
+owner: claude-code
+priority: P2-enhancement
+status: ✅ DONE (Sprint 4)
+stages:
+  - define: 觀戰區需求
+  - implement: 獨立區域 + 練習靶
+  - implement: 淘汰後傳送
+  - verify: 被淘汰 → 重生在觀戰區 → 可打靶 → 不影響比賽
+success_criteria:
+  - 4 個練習靶
+  - 淘汰玩家自動傳送
+  - 觀戰區玩家不能傷害比賽中玩家
+artifacts:
+  - src/ServerScriptService/MapBuilder.lua (spectator section)
+recovery:
+  - 傳送失敗 → 確認 SpectatorSpawn 存在

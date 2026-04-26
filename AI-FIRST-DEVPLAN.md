@@ -70,53 +70,62 @@ recovery:
 
 **開發節奏：Sprint-based，每個 Sprint 是一天**
 
-#### Sprint 1：地基（Day 1）
+#### Sprint 1：地基 — ✅ DONE
 ```
-Issue: "建立可進入的遊戲世界"
+Status: 已完成（MapBuilder.lua 已寫入）
 Work Items:
-  □ MapBuilder 生成 Last Zone 地圖
-  □ 大廳 + 啟動台
-  □ 競技場 + 掩體
-  □ 觀戰區
-  □ 燈光氛圍 (夜間/紅光/霧氣)
-  □ R15 Avatar 設定確認
-驗收: 進入 Studio → Play → 能在大廳走動 → 踩啟動台傳送到競技場
+  ☑ MapBuilder 生成 Last Zone 地圖
+  ☑ 大廳 + 啟動台
+  ☑ 競技場 + 掩體
+  ☑ 觀戰區
+  ☑ 燈光氛圍 (夜間/紅光/霧氣)
+  ☑ R15 Avatar 設定
 ```
 
-#### Sprint 2：核心循環（Day 2）
+#### Sprint 2：核心循環 — ✅ DONE
 ```
-Issue: "比賽可以從頭跑到尾"
+Status: 已完成（MatchManager.lua + PlayerHealth.lua 已寫入）
 Work Items:
-  □ MatchManager 5 階段循環
-  □ PlayerHealth 100 HP + 淘汰
-  □ PvE/PvP 切換邏輯
-  □ 倒數 UI
-  □ 勝利判定
-驗收: 1人測試 → 大廳啟動 → 180秒倒數 → PvP倒數 → 比賽結束回大廳
+  ☑ MatchManager 5 階段循環
+  ☑ PlayerHealth 100 HP + 淘汰
+  ☑ PvE/PvP 切換邏輯
+  ☑ 倒數 UI
+  ☑ 勝利判定
 ```
 
-#### Sprint 3：戰鬥（Day 3）
+#### Sprint 3：戰鬥 — ✅ DONE
 ```
-Issue: "能打能撿能死"
+Status: 已完成（WeaponClient + NPCSystem + LootSystem 已寫入）
 Work Items:
-  □ 6把武器射擊功能
-  □ R15 NPC 3種類型
-  □ NPC AI (巡邏/追擊/攻擊)
-  □ 戰利品掉落 + 拾取
-  □ 醫療包回血 (cap 100)
-驗收: 進競技場 → 撿武器 → 打NPC → NPC掉寶 → 撿醫療包回血
+  ☑ 6把武器射擊功能
+  ☑ R15 NPC 3種類型
+  ☑ NPC AI (巡邏/追擊/攻擊)
+  ☑ 戰利品掉落 + 拾取
+  ☑ 醫療包回血 (cap 100)
 ```
 
-#### Sprint 4：打磨（Day 4）
+#### Sprint 4：打磨 — ✅ DONE
 ```
-Issue: "看起來像個遊戲"
+Status: 已完成（HUDController.lua 已寫入）
 Work Items:
-  □ 完整 HUD (HP/彈藥/階段/存活人數/Kill Feed)
-  □ 命中特效 (spark)
-  □ 準心
-  □ 淘汰後傳送觀戰區
-  □ 觀戰區打靶練習
-驗收: 完整一輪 12人測試（或模擬），UI 清晰，體驗流暢
+  ☑ 完整 HUD (HP/彈藥/階段/存活人數/Kill Feed)
+  ☑ 命中特效 (spark)
+  ☑ 準心
+  ☑ 淘汰後傳送觀戰區
+  ☑ 觀戰區打靶練習
+```
+
+#### Sprint 5：Studio 整合測試 — ⭐ NEXT
+```
+Status: 待執行
+Work Items:
+  □ 在 Studio 中透過 MCP 寫入所有腳本
+  □ 完整 Playtest（單人流程測試）
+  □ 用 generate_mesh 替換基本幾何為精緻模型
+  □ 用 generate_material 加入材質
+  □ 調整效能 + 視覺打磨
+  □ 產出 Sprint 5 Receipt
+驗收: Studio 內可玩完整一輪，無 error，視覺精緻
 ```
 
 ---
@@ -140,43 +149,43 @@ Work Items:
 官方 MCP server 內建在 Studio 中（`rbxmcp`），透過 stdio 與 Claude Code 通訊。
 啟用方式：Studio → View → Assistant → `…` → Manage MCP Servers → Enable Studio as MCP server
 
-| Peter Pang 層 | MCP 工具 | 用途 |
-|---|---|---|
-| **Plan** | `search_game_tree` | 探索現有遊戲結構，了解要改什麼 |
-| **Plan** | `inspect_instance` | 檢查物件屬性，確認需求 gap |
-| **Execute** | `multi_edit` | 寫入/修改腳本（不存在則自動建立） |
-| **Execute** | `execute_luau` | 直接在 Studio 跑 Luau 代碼 |
-| **Execute** | `generate_mesh` | AI 生成 3D 模型（⭐ 官方獨家） |
-| **Execute** | `generate_material` | AI 生成材質/紋理（⭐ 官方獨家） |
-| **Execute** | `insert_from_creator_store` | 從商店拉資產進專案 |
-| **Verify** | `start_stop_play` | 開始/停止 Playtest |
-| **Verify** | `console_output` | 取得 Output 日誌，抓錯誤 |
-| **Verify** | `simulate_input` | 模擬玩家輸入測試互動（⭐ 官方獨家） |
-| **Verify** | `script_grep` | 搜尋所有腳本中的模式 |
-| **Learn** | `script_read` | 讀取腳本回顧修改結果 |
+| MCP 工具 | 用途 |
+|---|---|
+| `search_game_tree` | 探索實例層級結構 |
+| `inspect_instance` | 查看實例屬性、子項 |
+| `multi_edit` | 寫入/修改腳本（不存在則建立） |
+| `execute_luau` | 在 Studio 中直接執行 Luau 代碼 |
+| `generate_mesh` | AI 生成 3D 模型（⭐ 官方獨家） |
+| `generate_material` | AI 生成材質/紋理（⭐ 官方獨家） |
+| `insert_from_creator_store` | 從商店拉資產進專案 |
+| `start_stop_play` | 開始/停止 Playtest |
+| `console_output` | 取得 Output 日誌，抓錯誤 |
+| `user_keyboard_input` / `user_mouse_input` | 模擬玩家輸入（⭐ 官方獨家） |
+| `script_grep` | 搜尋所有腳本中的模式 |
+| `script_read` | 讀取腳本回顧修改結果 |
 
 #### Claude Code + 官方 MCP 的執行流程
 
 ```bash
 # 1. CLAIM: 探索現狀，確認要做什麼
-claude> search_game_tree(query="ServerScriptService")  # 看當前結構
-claude> inspect_instance(path="ServerScriptService")    # 檢查細節
+claude> search_game_tree(query="ServerScriptService")
+claude> inspect_instance(path="ServerScriptService")
 
 # 2. WRITE: 透過 MCP 寫入 Studio
-claude> multi_edit(script="ServerScriptService.MatchManager", ...)  # 寫入/修改
-claude> execute_luau(code="print('test')")              # 快速驗證邏輯
-claude> generate_mesh(prompt="dark concrete wall")      # AI 生成 3D 資產
-claude> generate_material(prompt="rusty metal floor")   # AI 生成材質
+claude> multi_edit(script="ServerScriptService.MatchManager", ...)
+claude> execute_luau(code="print('test')")
+claude> generate_mesh(prompt="dark concrete wall")
+claude> generate_material(prompt="rusty metal floor")
 
 # 3. TEST: 透過 MCP 測試
-claude> start_stop_play(action="start")                 # 開始 Playtest
-claude> console_output()                                # 看 Output 錯誤
-claude> simulate_input(action="move", direction="forward")  # 模擬玩家行為
-claude> start_stop_play(action="stop")                  # 停止
+claude> start_stop_play(action="start")
+claude> console_output()
+claude> user_keyboard_input(key="W", duration=2)
+claude> start_stop_play(action="stop")
 
 # 4. VERIFY: 檢查是否符合 contract
-claude> script_grep(pattern="Damage")                   # 確認傷害邏輯
-claude> inspect_instance(path="Workspace.LastZone")     # 確認地圖結構
+claude> script_grep(pattern="Damage")
+claude> inspect_instance(path="Workspace.LastZone")
 ```
 
 #### 失敗處理（Recovery Path = Happy Path 同等重要）
@@ -185,7 +194,7 @@ claude> inspect_instance(path="Workspace.LastZone")     # 確認地圖結構
 |----------|----------|
 | Script error on playtest | `console_output` → 讀錯誤 → `multi_edit` 修復 → `start_stop_play` 重測 |
 | NPC 不動 | `execute_luau` 檢查 Humanoid 狀態 → `inspect_instance` 確認 R15 骨架 |
-| 武器不造成傷害 | `script_grep("RemoteEvent")` 確認事件連線 → `script_read` 查 Raycast 參數 |
+| 武器不造成傷害 | `script_grep("RemoteEvent")` 確認事件連線 → `script_read` 查 Raycast |
 | UI 不顯示 | `search_game_tree(query="StarterGui")` 確認 LocalScript 層級 |
 | MCP 連不上 Studio | 確認 Studio → Assistant → MCP Server 已啟用 |
 | 3D 模型品質不佳 | `generate_mesh` 調整 prompt → 重新生成 |
@@ -304,11 +313,12 @@ Roblox Studio（內建 MCP server）
 
 ## 立即行動
 
-1. **今天**：在你的電腦裝好 Claude Code + Roblox MCP + Studio Plugin
-2. **Day 1**：跑 Sprint 1（地圖生成），用 MCP 把 MapBuilder 寫進 Studio
-3. **Day 2**：跑 Sprint 2（核心循環），MatchManager + PlayerHealth
-4. **Day 3**：跑 Sprint 3（戰鬥），WeaponSystem + NPCSystem + LootSystem
-5. **Day 4**：跑 Sprint 4（打磨），HUD + 特效 + 觀戰區
-6. **Day 5**：整體 Playtest + Receipt + Learn cycle
+Sprint 1–4 的程式碼已完成（`src/` 下 10 個腳本，2053 行）。下一步：
 
-**4-5 天出一個可玩原型。**
+1. **今天**：在電腦裝好 Claude Code + Roblox Studio MCP
+2. **Sprint 5**：透過 MCP 將 `src/` 腳本寫入 Studio → Playtest → 修 Bug
+3. **Sprint 5+**：用 `generate_mesh` / `generate_material` 替換基本幾何為精緻模型
+4. **Sprint 6**：多人測試 + 效能調整
+5. **Sprint 7**：Team Mode / Ranking 擴展
+
+**重點已從「寫程式」轉向「Studio 整合 + 視覺打磨 + 測試驗證」。**

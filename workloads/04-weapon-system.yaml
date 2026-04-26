@@ -1,0 +1,23 @@
+name: WeaponSystem
+owner: claude-code
+priority: P0-prototype
+status: ✅ DONE (Sprint 3)
+stages:
+  - define: 6 把虛構武器數據 (GameConfig)
+  - implement: 射擊 Raycast + 傷害計算
+  - implement: 彈藥消耗 + 換彈
+  - implement: 客戶端輸入 + 自動射擊
+  - verify: 每把武器射擊 + 傷害 + 換彈正常
+success_criteria:
+  - 6 把武器可裝備可射擊
+  - Viper 25, Stinger 15, Phantom 30, Thunder 12×8, Wraith 90, Fang 40
+  - 全自動/半自動模式正確
+  - 彈藥耗盡需換彈
+artifacts:
+  - src/ReplicatedStorage/GameConfig.lua (weapon data)
+  - src/ServerScriptService/MatchManager.lua (fire handler)
+  - src/StarterPlayerScripts/WeaponClient.lua
+  - src/ServerStorage/WeaponSystem.lua
+recovery:
+  - Raycast 穿牆 → FilterDescendantsInstances 排除自己
+  - 傷害不觸發 → 檢查 RemoteEvent 是否在 GameEvents 建立

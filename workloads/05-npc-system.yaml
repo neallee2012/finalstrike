@@ -1,0 +1,21 @@
+name: NPCSystem
+owner: claude-code
+priority: P0-prototype
+status: ✅ DONE (Sprint 3)
+stages:
+  - define: 3 種 R15 NPC (Patrol/Armored/Elite)
+  - implement: R15 骨架 + Motor6D joints
+  - implement: AI 巡邏/偵測/追擊/攻擊
+  - implement: 被擊敗掉落戰利品
+  - verify: NPC 巡邏 → 偵測玩家 → 追擊 → 攻擊 → 死亡掉寶
+success_criteria:
+  - Patrol 60HP, Armored 150HP, Elite 250HP
+  - R15 骨架完整（15 parts + Motor6D）
+  - 偵測範圍內追擊，攻擊範圍內造成傷害
+  - 死亡後根據 LootTable 掉落物品
+artifacts:
+  - src/ServerScriptService/NPCSystem.lua
+  - src/ReplicatedStorage/GameConfig.lua (enemy data)
+recovery:
+  - NPC 不動 → 確認 HumanoidRootPart 存在 + Motor6D 完整
+  - NPC 穿牆 → 檢查 CanCollide 設定

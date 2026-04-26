@@ -1,0 +1,25 @@
+name: MatchManager
+owner: claude-code
+priority: P0-prototype
+status: ✅ DONE (Sprint 2)
+stages:
+  - define: 5 階段循環 (Lobby/PvE/PvPWarning/PvP/MatchEnd)
+  - implement: 階段切換 + 倒數計時
+  - implement: PvE 階段禁止 PvP 傷害
+  - implement: PvP 倒數 10 秒 + 啟用
+  - implement: 勝利判定 + 回大廳
+  - verify: 1人測試完整循環
+success_criteria:
+  - 大廳啟動 → 傳送競技場
+  - PvE 180 秒倒數正確
+  - "FINAL STRIKE BEGINS" 公告顯示
+  - PvP 10 秒倒數後啟用傷害
+  - 最後存活者獲勝公告
+  - 8 秒後回大廳
+artifacts:
+  - src/ServerScriptService/MatchManager.lua
+  - src/ReplicatedStorage/GameConfig.lua
+  - src/ReplicatedStorage/GameEvents.lua
+recovery:
+  - 多人同時踩啟動台重複觸發 → 加 MatchRunning guard
+  - 斷線玩家未清理 → PlayerRemoving 事件處理

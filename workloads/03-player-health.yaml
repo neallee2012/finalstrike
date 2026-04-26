@@ -1,0 +1,20 @@
+name: PlayerHealth
+owner: claude-code
+priority: P0-prototype
+status: ✅ DONE (Sprint 2)
+stages:
+  - define: 100 HP 系統 + 淘汰機制
+  - implement: damagePlayer / healPlayer API
+  - implement: 淘汰後傳送觀戰區
+  - implement: 被淘汰者不影響比賽中玩家
+  - verify: HP 歸零 → 淘汰 → 傳送觀戰區
+success_criteria:
+  - 起始 100 HP
+  - 醫療包回 50 HP，cap 100
+  - HP 歸零標記 Eliminated
+  - 淘汰後傳送觀戰區
+artifacts:
+  - src/ServerScriptService/PlayerHealth.lua
+  - src/ServerScriptService/MatchManager.lua (health handlers)
+recovery:
+  - 淘汰後仍可傷害他人 → 檢查 Eliminated flag

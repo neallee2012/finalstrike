@@ -1,0 +1,25 @@
+name: HUD
+owner: claude-code
+priority: P1-polish
+status: ✅ DONE (Sprint 4)
+stages:
+  - define: UI 元素清單
+  - implement: HP 血量條 (顏色隨血量變化)
+  - implement: 彈藥顯示
+  - implement: 階段文字 + 倒數計時
+  - implement: 存活人數
+  - implement: Kill Feed
+  - implement: 勝利者橫幅
+  - implement: 準心
+  - implement: 公告系統 (淡入淡出)
+  - verify: 所有 UI 元素在各階段正確顯示
+success_criteria:
+  - HP 條顏色：>60% 綠 / >30% 黃 / ≤30% 紅
+  - 存活人數即時更新
+  - Kill Feed 5 秒後消失
+  - 勝利者金色大字 6 秒後淡出
+artifacts:
+  - src/StarterGui/HUDController.lua
+recovery:
+  - UI 重生後消失 → 確認 ResetOnSpawn=false
+  - 事件不觸發 → 確認 GameEvents 裡有對應 RemoteEvent

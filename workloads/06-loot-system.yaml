@@ -1,0 +1,20 @@
+name: LootSystem
+owner: claude-code
+priority: P1-polish
+status: ✅ DONE (Sprint 3)
+stages:
+  - define: 4 種拾取物 (Ammo/Medkit/Coin/Weapon)
+  - implement: 地圖固定生成點 + NPC 掉落
+  - implement: 拾取觸發 (Touched event)
+  - implement: 浮動動畫 + 發光效果
+  - verify: 拾取 → 效果正確 (彈藥+15, 回血+50, 金幣+10, 換武器)
+success_criteria:
+  - 拾取物有 Neon 材質 + PointLight
+  - 浮動旋轉動畫
+  - 60 秒自動消失
+  - 醫療包 heal 50, cap 100
+artifacts:
+  - src/ServerScriptService/LootSystem.lua
+recovery:
+  - Touched 不觸發 → 確認 CanCollide=false
+  - 重複拾取 → Destroy 後從 activeLoot 移除

@@ -1,0 +1,19 @@
+name: RankingLeaderboard
+owner: TBD
+priority: P3-future
+status: ⏳ NOT STARTED
+stages:
+  - define: 排名數據結構
+  - implement: 擊殺/存活統計
+  - implement: 排行榜 UI
+  - implement: DataStore 持久化
+  - verify: 多場比賽後排名正確
+success_criteria:
+  - 即時擊殺排行
+  - 跨場次累計統計
+  - DataStore 存取正常
+artifacts:
+  - TBD
+dependencies:
+  - MatchManager
+  - PlayerHealth
