@@ -12,7 +12,8 @@ local events = ReplicatedStorage:WaitForChild("GameEvents")
 local NPCSystem = {}
 local activeNPCs = {}
 
--- Path agent parameters tuned for our R15 NPC (HipHeight 3.5, ~2 stud wide, ~5 tall)
+-- PathfindingService agent params tuned for the standard R15 character
+-- (~2 stud wide, ~5 stud tall, default HipHeight ~2.2).
 local PATH_AGENT = {
 	AgentRadius = 2,
 	AgentHeight = 5,
@@ -24,126 +25,129 @@ local PATH_RECOMPUTE_DIST = 8     -- recompute when target moves this far
 local PATH_RECOMPUTE_INTERVAL = 1.5 -- or after this many seconds
 local WAYPOINT_REACHED_DIST = 4   -- advance to next waypoint within this distance
 
--- Build R15 NPC model from scratch
+-- Per-type body color overrides. Patrol uses GameConfig.ENEMIES[].Color directly;
+-- Armored gets dark steel; Elite gets pitch black (eyes glow via PointLight on Head).
+local BODY_COLORS = {
+	Patrol  = nil,  -- use config.Color
+	Armored = Color3.fromRGB(60, 60, 75),
+	Elite   = Color3.fromRGB(20, 20, 25),
+}
+
+local function paintBody(desc, color)
+	desc.HeadColor     = color
+	desc.TorsoColor    = color
+	desc.LeftArmColor  = color
+	desc.RightArmColor = color
+	desc.LeftLegColor  = color
+	desc.RightLegColor = color
+end
+
+-- Build a Part welded rigidly to a body part. Welded so it follows animation;
+-- Massless so it doesn't affect physics. CFrame is local-offset relative to host.
+local function attach(host, name, size, color, material, localOffset)
+	local part = Instance.new("Part")
+	part.Name = name
+	part.Size = size
+	part.Color = color
+	part.Material = material or Enum.Material.SmoothPlastic
+	part.CanCollide = false
+	part.Massless = true
+	part.CFrame = host.CFrame * localOffset
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = host
+	weld.Part1 = part
+	weld.Parent = part
+	part.Parent = host.Parent
+	return part
+end
+
+-- Per-type silhouette accessories built from primitives. Welded to Head/UpperTorso
+-- so they ride the R15 animation and visually distinguish each NPC archetype.
+local function dressNPC(model, enemyType)
+	local head = model:FindFirstChild("Head")
+	local torso = model:FindFirstChild("UpperTorso")
+	if not (head and torso) then return end
+
+	if enemyType == "Patrol" then
+		-- Security cap: dark dome + visor
+		attach(head, "Cap",   Vector3.new(1.4, 0.4, 1.4), Color3.fromRGB(25, 25, 30), Enum.Material.SmoothPlastic, CFrame.new(0, 0.65, 0))
+		attach(head, "Visor", Vector3.new(1.5, 0.15, 1.0), Color3.fromRGB(15, 15, 20), Enum.Material.SmoothPlastic, CFrame.new(0, 0.45, -0.4))
+		-- Chest badge
+		attach(torso, "Badge", Vector3.new(0.45, 0.55, 0.1), Color3.fromRGB(220, 200, 60), Enum.Material.Neon, CFrame.new(-0.55, 0.3, -0.55))
+	elseif enemyType == "Armored" then
+		-- Combat helmet: thick black wrap-around
+		attach(head, "Helmet",       Vector3.new(1.6, 1.0, 1.6), Color3.fromRGB(40, 40, 48), Enum.Material.Metal, CFrame.new(0, 0.35, 0))
+		attach(head, "HelmetVisor",  Vector3.new(1.65, 0.3, 0.5), Color3.fromRGB(20, 25, 35), Enum.Material.Glass, CFrame.new(0, 0.05, -0.6))
+		-- Tactical vest: bulky chest plate + 2 pouches
+		attach(torso, "Vest",     Vector3.new(2.3, 1.7, 1.3), Color3.fromRGB(45, 50, 60), Enum.Material.Metal, CFrame.new(0, 0, 0))
+		attach(torso, "PouchL",   Vector3.new(0.6, 0.5, 0.4), Color3.fromRGB(35, 38, 45), Enum.Material.Fabric, CFrame.new(-0.7, -0.4, -0.7))
+		attach(torso, "PouchR",   Vector3.new(0.6, 0.5, 0.4), Color3.fromRGB(35, 38, 45), Enum.Material.Fabric, CFrame.new(0.7, -0.4, -0.7))
+		attach(torso, "Shoulder", Vector3.new(2.6, 0.5, 1.2), Color3.fromRGB(55, 60, 70), Enum.Material.Metal, CFrame.new(0, 0.7, 0))
+	elseif enemyType == "Elite" then
+		-- Hood: oversized dark cowl extending forward and down
+		attach(head, "Hood",     Vector3.new(1.7, 1.5, 1.7), Color3.fromRGB(15, 15, 20), Enum.Material.Fabric, CFrame.new(0, 0.25, 0.1))
+		attach(head, "HoodFront",Vector3.new(1.4, 0.4, 0.3), Color3.fromRGB(15, 15, 20), Enum.Material.Fabric, CFrame.new(0, -0.1, -0.7))
+		-- Glowing chest sigil (red)
+		attach(torso, "Sigil",   Vector3.new(0.8, 0.8, 0.1), Color3.fromRGB(255, 40, 30), Enum.Material.Neon, CFrame.new(0, 0.2, -0.55))
+		-- Cape on back
+		local cape = attach(torso, "Cape", Vector3.new(2.2, 3.5, 0.15), Color3.fromRGB(20, 18, 25), Enum.Material.Fabric, CFrame.new(0, -0.6, 0.6))
+		cape.Transparency = 0.05
+	end
+end
+
+-- Build R15 NPC using Roblox's standard character mesh.
+-- Players:CreateHumanoidModelFromDescription returns a fully rigged R15 model
+-- with MeshPart body parts, default Animate LocalScript, and Motor6D joints —
+-- so we don't have to maintain rigging code ourselves.
 local function createR15NPC(enemyType, position)
 	local config = GameConfig.ENEMIES[enemyType]
 	if not config then return nil end
 
-	local model = Instance.new("Model")
+	local desc = Instance.new("HumanoidDescription")
+	paintBody(desc, BODY_COLORS[enemyType] or config.Color)
+
+	local model = Players:CreateHumanoidModelFromDescription(desc, Enum.HumanoidRigType.R15)
 	model.Name = enemyType .. "NPC"
 
-	-- R15 body parts
-	local partDefs = {
-		{ Name = "HumanoidRootPart", Size = Vector3.new(2, 2, 1), Pos = Vector3.new(0, 3, 0), Transparency = 1 },
-		{ Name = "Head", Size = Vector3.new(1.2, 1.2, 1.2), Pos = Vector3.new(0, 4.8, 0) },
-		{ Name = "UpperTorso", Size = Vector3.new(2, 1.6, 1), Pos = Vector3.new(0, 3.8, 0) },
-		{ Name = "LowerTorso", Size = Vector3.new(2, 0.4, 1), Pos = Vector3.new(0, 2.8, 0) },
-		{ Name = "LeftUpperArm", Size = Vector3.new(1, 1.2, 1), Pos = Vector3.new(-1.5, 3.8, 0) },
-		{ Name = "LeftLowerArm", Size = Vector3.new(1, 1.2, 1), Pos = Vector3.new(-1.5, 2.6, 0) },
-		{ Name = "LeftHand", Size = Vector3.new(1, 0.3, 1), Pos = Vector3.new(-1.5, 1.85, 0) },
-		{ Name = "RightUpperArm", Size = Vector3.new(1, 1.2, 1), Pos = Vector3.new(1.5, 3.8, 0) },
-		{ Name = "RightLowerArm", Size = Vector3.new(1, 1.2, 1), Pos = Vector3.new(1.5, 2.6, 0) },
-		{ Name = "RightHand", Size = Vector3.new(1, 0.3, 1), Pos = Vector3.new(1.5, 1.85, 0) },
-		{ Name = "LeftUpperLeg", Size = Vector3.new(1, 1.3, 1), Pos = Vector3.new(-0.5, 1.65, 0) },
-		{ Name = "LeftLowerLeg", Size = Vector3.new(1, 1.3, 1), Pos = Vector3.new(-0.5, 0.35, 0) },
-		{ Name = "LeftFoot", Size = Vector3.new(1, 0.3, 1), Pos = Vector3.new(-0.5, -0.35, 0) },
-		{ Name = "RightUpperLeg", Size = Vector3.new(1, 1.3, 1), Pos = Vector3.new(0.5, 1.65, 0) },
-		{ Name = "RightLowerLeg", Size = Vector3.new(1, 1.3, 1), Pos = Vector3.new(0.5, 0.35, 0) },
-		{ Name = "RightFoot", Size = Vector3.new(1, 0.3, 1), Pos = Vector3.new(0.5, -0.35, 0) },
-	}
-
-	for _, def in ipairs(partDefs) do
-		local part = Instance.new("Part")
-		part.Name = def.Name
-		part.Size = def.Size
-		part.Position = position + def.Pos
-		part.Anchored = false
-		part.CanCollide = (def.Name == "HumanoidRootPart" or def.Name == "Head" or
-			def.Name == "UpperTorso" or def.Name == "LowerTorso")
-		part.Color = config.Color
-		part.Material = Enum.Material.SmoothPlastic
-		part.TopSurface = Enum.SurfaceType.Smooth
-		part.BottomSurface = Enum.SurfaceType.Smooth
-		if def.Transparency then part.Transparency = def.Transparency end
-
-		-- Elite gets glowing eyes via head neon
-		if def.Name == "Head" and enemyType == "Elite" then
-			part.Material = Enum.Material.SmoothPlastic
-			-- Add face
-			local face = Instance.new("Decal")
-			face.Name = "face"
-			face.Face = Enum.NormalId.Front
-			face.Parent = part
-		end
-
-		part.Parent = model
-	end
-
-	model.PrimaryPart = model:FindFirstChild("HumanoidRootPart")
-
-	-- Red glow on chest so NPCs are visible against the dark cinematic backdrop.
-	-- Elite gets a brighter, longer-range light to telegraph priority threat.
-	local glow = Instance.new("PointLight")
-	glow.Name = "ThreatGlow"
-	glow.Color = Color3.fromRGB(255, 40, 30)
-	glow.Brightness = enemyType == "Elite" and 4 or 2
-	glow.Range = enemyType == "Elite" and 22 or 14
-	glow.Shadows = true
-	glow.Parent = model:FindFirstChild("UpperTorso")
-
-	-- Humanoid (R15 rig type)
-	-- HipHeight = (HRP local Y) - (Foot local Y) + (foot half-height)
-	--           = 3 - (-0.35) + 0.15 = 3.5
-	-- Without this, HRP rests on floor and feet sink ~2.35 below ground.
-	local humanoid = Instance.new("Humanoid")
-	humanoid.RigType = Enum.HumanoidRigType.R15
-	humanoid.HipHeight = 3.5
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	humanoid.MaxHealth = config.HP
 	humanoid.Health = config.HP
 	humanoid.WalkSpeed = config.Speed
-	humanoid.Parent = model
+	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
 
-	-- Motor6D joints for R15.
-	-- Parent = closer-to-root body part, Child = further. Joint forces:
-	--   Child.CFrame = Parent.CFrame * C0 * C1:Inverse()
-	-- Convention: C0 = (Child - Parent) translation in Parent's local space, C1 = identity.
-	-- partDefs.Pos values (in spawn-local space, treating spawn as origin) drive these C0s.
-	local joints = {
-		-- Spine
-		{ Name = "Root",          Parent = "HumanoidRootPart", Child = "LowerTorso",   C0 = CFrame.new(0,   -0.2, 0) },
-		{ Name = "Waist",         Parent = "LowerTorso",       Child = "UpperTorso",   C0 = CFrame.new(0,    1.0, 0) },
-		{ Name = "Neck",          Parent = "UpperTorso",       Child = "Head",         C0 = CFrame.new(0,    1.0, 0) },
-		-- Left leg
-		{ Name = "LeftHip",       Parent = "LowerTorso",       Child = "LeftUpperLeg", C0 = CFrame.new(-0.5, -1.15, 0) },
-		{ Name = "LeftKnee",      Parent = "LeftUpperLeg",     Child = "LeftLowerLeg", C0 = CFrame.new(0,   -1.3, 0) },
-		{ Name = "LeftAnkle",     Parent = "LeftLowerLeg",     Child = "LeftFoot",     C0 = CFrame.new(0,   -0.7, 0) },
-		-- Right leg
-		{ Name = "RightHip",      Parent = "LowerTorso",       Child = "RightUpperLeg",C0 = CFrame.new(0.5, -1.15, 0) },
-		{ Name = "RightKnee",     Parent = "RightUpperLeg",    Child = "RightLowerLeg",C0 = CFrame.new(0,   -1.3, 0) },
-		{ Name = "RightAnkle",    Parent = "RightLowerLeg",    Child = "RightFoot",    C0 = CFrame.new(0,   -0.7, 0) },
-		-- Left arm
-		{ Name = "LeftShoulder",  Parent = "UpperTorso",       Child = "LeftUpperArm", C0 = CFrame.new(-1.5, 0,   0) },
-		{ Name = "LeftElbow",     Parent = "LeftUpperArm",     Child = "LeftLowerArm", C0 = CFrame.new(0,   -1.2, 0) },
-		{ Name = "LeftWrist",     Parent = "LeftLowerArm",     Child = "LeftHand",     C0 = CFrame.new(0,   -0.75,0) },
-		-- Right arm
-		{ Name = "RightShoulder", Parent = "UpperTorso",       Child = "RightUpperArm",C0 = CFrame.new(1.5,  0,   0) },
-		{ Name = "RightElbow",    Parent = "RightUpperArm",    Child = "RightLowerArm",C0 = CFrame.new(0,   -1.2, 0) },
-		{ Name = "RightWrist",    Parent = "RightLowerArm",    Child = "RightHand",    C0 = CFrame.new(0,   -0.75,0) },
-	}
-
-	for _, j in ipairs(joints) do
-		local parentPart = model:FindFirstChild(j.Parent)
-		local childPart = model:FindFirstChild(j.Child)
-		local motor = Instance.new("Motor6D")
-		motor.Name = j.Name
-		motor.Part0 = parentPart
-		motor.Part1 = childPart
-		motor.C0 = j.C0
-		motor.C1 = CFrame.new()  -- identity
-		motor.Parent = childPart
+	-- Threat glow on chest so NPCs read in the dark cinematic backdrop.
+	local upperTorso = model:FindFirstChild("UpperTorso")
+	if upperTorso then
+		local glow = Instance.new("PointLight")
+		glow.Name = "ThreatGlow"
+		glow.Color = Color3.fromRGB(255, 40, 30)
+		glow.Brightness = enemyType == "Elite" and 4 or 2
+		glow.Range = enemyType == "Elite" and 22 or 14
+		glow.Shadows = true
+		glow.Parent = upperTorso
 	end
 
-	-- Set attributes
+	-- Elite gets a separate red eye glow on the head.
+	if enemyType == "Elite" then
+		local head = model:FindFirstChild("Head")
+		if head then
+			local eyes = Instance.new("PointLight")
+			eyes.Name = "EyeGlow"
+			eyes.Color = Color3.fromRGB(255, 60, 50)
+			eyes.Brightness = 3
+			eyes.Range = 8
+			eyes.Parent = head
+		end
+	end
+
+	-- Per-type silhouette accessories (helmet, vest, hood, etc.)
+	dressNPC(model, enemyType)
+
+	-- Position so feet land just above the floor; Humanoid HipHeight handles
+	-- the rest. The marker sits at y=1 (above ArenaFloor at y=0); pivot the
+	-- HRP ~3 stud higher so the rig has room to settle.
+	model:PivotTo(CFrame.new(position + Vector3.new(0, 3, 0)))
+
 	model:SetAttribute("EnemyType", enemyType)
 	model:SetAttribute("HP", config.HP)
 	model:SetAttribute("MaxHP", config.HP)
