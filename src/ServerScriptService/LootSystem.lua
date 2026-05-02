@@ -78,6 +78,7 @@ local function createPickup(lootType, position, weaponName)
 			if wn then
 				data.Weapon = wn
 				events.EquipWeapon:FireClient(player, wn)
+				mm.attachWeapon(player, wn)
 			end
 		end
 

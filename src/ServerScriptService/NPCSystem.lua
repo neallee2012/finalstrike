@@ -232,6 +232,7 @@ local function dropLoot(npcModel)
 					if weaponName then
 						data.Weapon = weaponName
 						events.EquipWeapon:FireClient(player, weaponName)
+						mm.attachWeapon(player, weaponName)
 					end
 				end
 

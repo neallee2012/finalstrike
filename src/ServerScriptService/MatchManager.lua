@@ -3,9 +3,11 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
 
 -- Wait for modules
 local GameConfig = require(ReplicatedStorage:WaitForChild("GameConfig"))
+local WeaponMeshes = require(ServerStorage:WaitForChild("WeaponMeshes"))
 local events = ReplicatedStorage:WaitForChild("GameEvents")
 
 local PhaseChanged = events:WaitForChild("PhaseChanged")
@@ -49,6 +51,42 @@ function MatchManager.initPlayerData(player)
 	local ammoUpdate = events:WaitForChild("AmmoUpdate")
 	ammoUpdate:FireClient(player, 30, GameConfig.WEAPONS.Viper.MagSize)
 end
+
+-- Build a weapon Tool and parent it to the player's Character so Roblox's
+-- built-in grip system holds it in the right hand with proper "tool pose"
+-- animation. Removes any previously equipped weapon first. Tool is replicated
+-- server-side so other players see it (third-person visible).
+function MatchManager.attachWeapon(player, weaponName)
+	local char = player.Character
+	if not char then return end
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return end
+
+	-- Remove any currently equipped Tool (auto-unequips and destroys)
+	for _, c in ipairs(char:GetChildren()) do
+		if c:IsA("Tool") then c:Destroy() end
+	end
+
+	local tool = WeaponMeshes.build(weaponName)
+	if not tool then return end
+
+	-- Parenting Tool directly to Character auto-equips it (skipping Backpack)
+	-- and triggers the engine's grip + tool-hold animation.
+	tool.Parent = char
+end
+
+-- Hook respawn so the weapon re-attaches on the new Character.
+local function bindRespawnHook(player)
+	player.CharacterAdded:Connect(function()
+		task.wait(0.5)  -- let R15 rig finish loading
+		local data = playerData[player]
+		if data and not data.Eliminated and data.Weapon then
+			MatchManager.attachWeapon(player, data.Weapon)
+		end
+	end)
+end
+Players.PlayerAdded:Connect(bindRespawnHook)
+for _, p in ipairs(Players:GetPlayers()) do bindRespawnHook(p) end
 
 function MatchManager.damagePlayer(player, damage, attacker)
 	local data = playerData[player]
@@ -232,11 +270,15 @@ function MatchManager.startMatch()
 
 	-- Teleport to arena
 	MatchManager.teleportToArena()
-	-- Grant spawn protection so NPCs can't gank players the instant they land
+	-- Grant spawn protection so NPCs can't gank players the instant they land,
+	-- and equip everyone's starting weapon model so it shows in their hand.
 	local protectionEnd = tick() + GameConfig.SPAWN_PROTECTION
 	for _, p in ipairs(Players:GetPlayers()) do
 		local d = playerData[p]
-		if d then d.ProtectedUntil = protectionEnd end
+		if d then
+			d.ProtectedUntil = protectionEnd
+			MatchManager.attachWeapon(p, d.Weapon)
+		end
 	end
 	Announcement:FireAllClients(string.format("SPAWN PROTECTION %ds", GameConfig.SPAWN_PROTECTION))
 	task.wait(1)
