@@ -131,8 +131,14 @@ PvE 蒐集階段 (180秒) → PvP 淘汰賽 → 最後存活者獲勝。
 ## Lessons Learned
 _隨開發進度持續更新_
 
-- R15 NPC 需要完整 Motor6D joints 才能 MoveTo
+- R15 NPC 不要自己手刻 — 用 `Players:CreateHumanoidModelFromDescription(desc, Enum.HumanoidRigType.R15)` 直接拿完整 character mesh + Motor6D + Animate LocalScript + BodyColors + 預設 HipHeight 2.19。手刻 16 Part + Motor6D 是 Sprint 5 踩過的 C0/C1 反向陷阱
+- 角色掛武器：用 `Tool` 不要手刻 Motor6D。Tool 直接 parent 到 Character 會 auto-equip + tool-hold 動畫 + Tool.Grip 自動算 grip pose
+- Tool.Grip 預設讓 Handle 的 `-Z` 方向對齊 hand 前向，所以武器 mesh 設計時把 muzzle attachment 放 Handle 的 -Z 端，`Tool.Grip = CFrame.new(0, +halfGripHeight, 0)` 就夠用，不需自己加旋轉
+- Tool 持槍要設 `CanBeDropped = false` + `ManualActivationOnly = true`，不然玩家會丟槍或觸發 default click 行為
+- HumanoidDescription.Shirt / Pants 只認 classic 2D Shirt/Pants asset type；creator store 多數結果是 layered clothing 3D model，餵進去會 fallback 到預設 template，3 種 NPC 看起來都穿同一件。視覺差異化用 programmatic accessories（Part + WeldConstraint 掛 Head/UpperTorso）反而更可控
+- `execute_luau` 在 playtest 是 client context — 看不到 ServerScriptService 子物件、`_G` 也是 client 的、設 Part 屬性也不會 replicate 給 server。驗證 server 狀態靠 `print` + `console_output`；要操控 server 狀態靠既有 RemoteEvent 鏈或臨時加 server-side debug 入口
 - Roblox Raycast 的 FilterType 要用 Exclude 而非 Include
+- 武器 raycast origin 要用 `Muzzle.WorldPosition`（gun barrel）不要用 Head — 不然子彈會從玩家臉穿出，掩體後伸出去的槍管沒用
 - RemoteEvent 必須先在 ReplicatedStorage 建立，client 才能 WaitForChild
 - ScreenGui.ResetOnSpawn = false 才不會每次重生丟失 UI
 - Touched event 需要 CanCollide=false 的 Part 才穩定觸發
@@ -140,5 +146,4 @@ _隨開發進度持續更新_
 - 官方 MCP 工具名稱與社群版不同，以官方文件為準
 - ReplicatedStorage 的 Script 預設 RunContext=Legacy 不會自動執行；bootstrap 腳本放 ServerScriptService 比較安全
 - Bootstrap script 不可與它在 runtime 建立的物件同名 — `WaitForChild` 會回傳第一個（通常是 Script），下游路徑全錯。慣例：`<Name>Bootstrap`
-- `execute_luau` 在 playtest 是 client context — 看不到 ServerScriptService 子物件、`_G` 也是 client 的；驗證 server 狀態靠 `print` + `console_output`，或檢查 ReplicatedStorage 共享物件
 - 持久化 HUD/UI：LocalScript 放 StarterPlayerScripts（每個玩家只跑一次），不要放 StarterGui（每次重生 clone 一份）。ScreenGui 也要 `ResetOnSpawn = false`
