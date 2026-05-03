@@ -47,6 +47,7 @@ makeRemoteEvent("AmmoUpdate")         -- server → client: current, max
 -- NPC
 makeRemoteEvent("NPCDamaged")         -- visual feedback
 makeRemoteEvent("NPCEliminated")      -- server → all: npcType, position
+makeRemoteEvent("NPCFireWeapon")      -- server → all: npcModel, muzzlePos, targetPos (visual flash + tracer)
 
 -- Kill feed
 makeRemoteEvent("KillFeed")           -- server → all: killer, victim, weapon

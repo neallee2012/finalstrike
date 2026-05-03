@@ -50,17 +50,27 @@ end
 -- enforcing so right-click drag and click-to-move work normally (#14, #15).
 local releaseEnforceUntil = 0
 
+-- Crosshair visibility — only show when actually aiming in first-person.
+-- Hidden in lobby (no shooting context), spectator, and while a menu is open.
+local function setCrosshairVisible(visible)
+	local pg = player:FindFirstChild("PlayerGui")
+	local cross = pg and pg:FindFirstChild("FinalStrikeCrosshair")
+	if cross then cross.Enabled = visible end
+end
+
 local function applyCameraState()
 	if shouldLock() then
 		player.CameraMode = Enum.CameraMode.LockFirstPerson
 		UserInputService.MouseIconEnabled = false
 		releaseEnforceUntil = 0
+		setCrosshairVisible(true)
 	else
 		player.CameraMode = Enum.CameraMode.Classic
 		UserInputService.MouseIconEnabled = true
 		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
 		-- Hold Default for ~1s so CameraScript's transition can't re-lock us
 		releaseEnforceUntil = tick() + 1.0
+		setCrosshairVisible(false)
 	end
 end
 

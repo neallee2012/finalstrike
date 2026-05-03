@@ -7,7 +7,8 @@ local GameConfig = {}
 GameConfig.MIN_PLAYERS = 1          -- 1 for testing, change to 2+ for production
 GameConfig.MAX_PLAYERS = 12
 GameConfig.PVE_DURATION = 180       -- seconds
-GameConfig.PVP_COUNTDOWN = 10       -- seconds
+GameConfig.PVP_COUNTDOWN = 10       -- seconds (warning before PvP starts)
+GameConfig.PVP_DURATION = 300       -- seconds (5 min PvP cap; ends with current alive winner)
 GameConfig.LOBBY_COUNTDOWN = 10     -- seconds before match starts
 GameConfig.SPAWN_PROTECTION = 3     -- seconds of NPC-damage immunity after teleport to arena
 

@@ -264,6 +264,7 @@ local crosshairGui = Instance.new("ScreenGui")
 crosshairGui.Name = "FinalStrikeCrosshair"
 crosshairGui.ResetOnSpawn = false
 crosshairGui.IgnoreGuiInset = true
+crosshairGui.Enabled = false  -- hidden by default; CameraController shows it in arena
 crosshairGui.Parent = player.PlayerGui
 
 -- CEO-spec 4-segment open-center reticle: top/bottom/left/right white lines
