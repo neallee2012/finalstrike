@@ -166,6 +166,30 @@ local function dropLoot(npcModel)
 	local config = GameConfig.ENEMIES[enemyType]
 	if not config then return end
 
+	-- NPC kill bounty for the player who landed the killing blow.
+	-- LastAttackerId is stamped by MatchManager.FireWeapon when an NPC takes damage.
+	local lastAttackerId = npcModel:GetAttribute("LastAttackerId")
+	if lastAttackerId and _G.CurrencyService then
+		local killer = Players:GetPlayerByUserId(lastAttackerId)
+		if killer then
+			local rewards = GameConfig.ECONOMY.Rewards
+			local amount = (enemyType == "Patrol" and rewards.KillPatrolNPC)
+				or (enemyType == "Armored" and rewards.KillArmoredNPC)
+				or (enemyType == "Elite" and rewards.KillEliteNPC)
+				or 0
+			if amount > 0 then
+				local actual = _G.CurrencyService.addCoins(killer, amount, "NpcKills")
+				if actual > 0 then
+					print(string.format("[Reward] %s +%d coins (Killed %s NPC)", killer.Name, actual, enemyType))
+				end
+			end
+			-- Quest progress (separate from coin reward — increments regardless of cap)
+			if _G.DailyQuestService then
+				_G.DailyQuestService.recordEvent(killer, "NpcKill", 1)
+			end
+		end
+	end
+
 	local pos = npcModel.PrimaryPart and npcModel.PrimaryPart.Position or Vector3.new(0, 5, 0)
 
 	-- Roll for each loot type
@@ -190,15 +214,6 @@ local function dropLoot(npcModel)
 			elseif lootType == "Coin" then
 				loot.Color = Color3.fromRGB(255, 215, 0)
 				loot.Material = Enum.Material.Neon
-			elseif lootType == "Weapon" then
-				loot.Color = Color3.fromRGB(150, 100, 255)
-				loot.Material = Enum.Material.Neon
-				-- Random weapon
-				local weaponNames = {}
-				for name, _ in pairs(GameConfig.WEAPONS) do
-					table.insert(weaponNames, name)
-				end
-				loot:SetAttribute("WeaponName", weaponNames[math.random(#weaponNames)])
 			end
 
 			-- Glow
@@ -227,12 +242,6 @@ local function dropLoot(npcModel)
 					mm.healPlayer(player, GameConfig.LOOT.Medkit.Heal)
 				elseif lootType == "Coin" then
 					data.Coins = data.Coins + GameConfig.LOOT.Coin.Amount
-				elseif lootType == "Weapon" then
-					local weaponName = loot:GetAttribute("WeaponName")
-					if weaponName then
-						data.Weapon = weaponName
-						events.EquipWeapon:FireClient(player, weaponName)
-					end
 				end
 
 				events.LootPickedUp:FireClient(player, lootType, lootType == "Coin" and GameConfig.LOOT.Coin.Amount or 1)

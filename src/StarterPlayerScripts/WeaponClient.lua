@@ -5,6 +5,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Debris = game:GetService("Debris")
 
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
@@ -16,7 +18,43 @@ local events = ReplicatedStorage:WaitForChild("GameEvents")
 local FireWeapon = events:WaitForChild("FireWeapon")
 local ReloadWeapon = events:WaitForChild("ReloadWeapon")
 
-local currentWeapon = "Viper"
+-- Look up the equipped weapon Tool's Muzzle attachment on the local character.
+-- Returns nil if no Tool equipped or muzzle missing (e.g. first frame before
+-- server attaches the Tool on respawn).
+local function getMuzzle()
+	local char = player.Character
+	if not char then return nil end
+	local tool = char:FindFirstChildOfClass("Tool")
+	if not tool then return nil end
+	local handle = tool:FindFirstChild("Handle")
+	if not handle then return nil end
+	return handle:FindFirstChild("Muzzle")
+end
+
+-- Quick muzzle flash at the gun barrel: bright sphere + PointLight, fade-out
+-- in 0.08s. Local-only effect (each player sees their own).
+local function spawnMuzzleFlash(muzzle)
+	if not muzzle then return end
+	local flash = Instance.new("Part")
+	flash.Size = Vector3.new(0.6, 0.6, 0.6)
+	flash.CFrame = CFrame.new(muzzle.WorldPosition)
+	flash.Anchored = true
+	flash.CanCollide = false
+	flash.Material = Enum.Material.Neon
+	flash.Color = Color3.fromRGB(255, 230, 140)
+	flash.Shape = Enum.PartType.Ball
+	flash.Parent = workspace
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(255, 220, 130)
+	light.Brightness = 8
+	light.Range = 12
+	light.Parent = flash
+	TweenService:Create(flash, TweenInfo.new(0.08), { Transparency = 1, Size = Vector3.new(0.05, 0.05, 0.05) }):Play()
+	TweenService:Create(light, TweenInfo.new(0.08), { Brightness = 0 }):Play()
+	Debris:AddItem(flash, 0.15)
+end
+
+local currentWeapon = GameConfig.STARTER_WEAPONS[1]
 local canFire = true
 local isReloading = false
 local isFiring = false
@@ -48,10 +86,16 @@ local function fireWeapon()
 
 	canFire = false
 
-	-- Get aim direction from camera
-	local origin = head.Position
+	-- Origin = gun muzzle if equipped, else head as fallback (e.g. first frame
+	-- before server attaches weapon model on respawn).
+	local muzzle = getMuzzle()
+	local origin = muzzle and muzzle.WorldPosition or head.Position
 	local unitRay = camera:ScreenPointToRay(mouse.X, mouse.Y)
 	local direction = unitRay.Direction
+
+	-- Local muzzle flash for the local player (server's WeaponHit handles the
+	-- impact spark; this is the gun-end of the shot).
+	spawnMuzzleFlash(muzzle)
 
 	if config.Type == "Knife" then
 		-- Melee: short range check

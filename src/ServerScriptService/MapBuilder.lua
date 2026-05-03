@@ -370,9 +370,9 @@ function MAP.buildArena(parent)
 		{ Type = "Medkit", Pos = Vector3.new(50, 1, -500) },
 		{ Type = "Coin", Pos = Vector3.new(10, 1, -420) },
 		{ Type = "Coin", Pos = Vector3.new(-80, 1, -400) },
-		{ Type = "Weapon", Pos = Vector3.new(0, 1, -350) },
-		{ Type = "Weapon", Pos = Vector3.new(-60, 7, -400) },
-		{ Type = "Weapon", Pos = Vector3.new(100, 1, -450) },
+		{ Type = "Coin", Pos = Vector3.new(0, 1, -350) },
+		{ Type = "Medkit", Pos = Vector3.new(-60, 7, -400) },
+		{ Type = "Coin", Pos = Vector3.new(100, 1, -450) },
 	}
 	for i, l in ipairs(lootPositions) do
 		local marker = Instance.new("Part")
