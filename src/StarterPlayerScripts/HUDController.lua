@@ -167,11 +167,42 @@ local function addKillFeedEntry(killer, victim, weapon)
 	end)
 end
 
+-- === CURRENCY DISPLAY (top-left, above alive count) ===
+local currencyFrame = Instance.new("Frame")
+currencyFrame.Name = "CurrencyFrame"
+currencyFrame.Size = UDim2.new(0, 200, 0, 32)
+currencyFrame.Position = UDim2.new(0, 20, 0, 10)
+currencyFrame.BackgroundColor3 = Color3.fromRGB(25, 22, 15)
+currencyFrame.BackgroundTransparency = 0.2
+currencyFrame.BorderSizePixel = 0
+currencyFrame.Parent = screenGui
+
+local currencyCorner = Instance.new("UICorner")
+currencyCorner.CornerRadius = UDim.new(0, 6)
+currencyCorner.Parent = currencyFrame
+
+local currencyStroke = Instance.new("UIStroke")
+currencyStroke.Color = Color3.fromRGB(255, 215, 0)
+currencyStroke.Thickness = 1
+currencyStroke.Parent = currencyFrame
+
+local currencyLabel = Instance.new("TextLabel")
+currencyLabel.Name = "CurrencyLabel"
+currencyLabel.Size = UDim2.new(1, -10, 1, 0)
+currencyLabel.Position = UDim2.new(0, 5, 0, 0)
+currencyLabel.BackgroundTransparency = 1
+currencyLabel.Text = "0 子彈幣 (B 開店)"
+currencyLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+currencyLabel.TextScaled = true
+currencyLabel.Font = Enum.Font.GothamBold
+currencyLabel.TextXAlignment = Enum.TextXAlignment.Left
+currencyLabel.Parent = currencyFrame
+
 -- === ALIVE PLAYERS COUNT ===
 local aliveFrame = Instance.new("Frame")
 aliveFrame.Name = "AliveFrame"
 aliveFrame.Size = UDim2.new(0, 160, 0, 30)
-aliveFrame.Position = UDim2.new(0, 20, 0, 10)
+aliveFrame.Position = UDim2.new(0, 20, 0, 50)  -- moved down to make room for currency display above
 aliveFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 aliveFrame.BackgroundTransparency = 0.3
 aliveFrame.BorderSizePixel = 0
@@ -299,10 +330,57 @@ if AliveCountUpdate then
 	end)
 end
 
--- Winner display
-local WinnerAnnounce = events:FindFirstChild("Announcement")
--- We detect winner text inside the existing Announcement handler
-local origAnnouncementHandler = nil -- already connected above
+-- === CURRENCY UPDATES + REWARD POPUPS ===
+-- Floating "+N" text that drifts up + fades, anchored under the currency frame.
+local function showRewardPopup(delta)
+	local popup = Instance.new("TextLabel")
+	popup.Size = UDim2.new(0, 200, 0, 30)
+	popup.Position = UDim2.new(0, 20, 0, 48)
+	popup.BackgroundTransparency = 1
+	popup.Text = "+" .. delta .. " 子彈幣"
+	popup.TextColor3 = Color3.fromRGB(255, 230, 60)
+	popup.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+	popup.TextStrokeTransparency = 0
+	popup.TextScaled = true
+	popup.Font = Enum.Font.GothamBlack
+	popup.TextXAlignment = Enum.TextXAlignment.Left
+	popup.Parent = screenGui
+
+	-- Float down + fade (positioned below currencyFrame, drifts further)
+	local TweenService = game:GetService("TweenService")
+	TweenService:Create(popup, TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Position = UDim2.new(0, 20, 0, 95),
+		TextTransparency = 1,
+		TextStrokeTransparency = 1,
+	}):Play()
+	task.delay(1.3, function() popup:Destroy() end)
+end
+
+local lastCoins = nil
+local function updateCurrencyDisplay(amount)
+	currencyLabel.Text = string.format("%d 子彈幣 (B 開店)", amount)
+	if lastCoins ~= nil and amount > lastCoins then
+		showRewardPopup(amount - lastCoins)
+	end
+	lastCoins = amount
+end
+
+local CurrencyUpdate = events:FindFirstChild("CurrencyUpdate")
+if CurrencyUpdate then
+	CurrencyUpdate.OnClientEvent:Connect(updateCurrencyDisplay)
+end
+
+-- Initial pull (sync RemoteFunction — no race with subscribe)
+task.spawn(function()
+	local GetCurrency = events:WaitForChild("GetCurrency", 5)
+	if GetCurrency then
+		local ok, c = pcall(function() return GetCurrency:InvokeServer() end)
+		if ok and type(c) == "number" then
+			updateCurrencyDisplay(c)
+			lastCoins = c  -- suppress popup on initial load (would show "+0" or "+full balance" otherwise)
+		end
+	end
+end)
 
 -- Hit marker effect (any surface) — bigger ball + pulsing PointLight
 local TweenService = game:GetService("TweenService")

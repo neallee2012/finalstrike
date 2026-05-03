@@ -21,9 +21,29 @@ MatchManager.CurrentPhase = GameConfig.PHASE.LOBBY
 MatchManager.AlivePlayers = {}
 MatchManager.PvPEnabled = false
 MatchManager.MatchRunning = false
+MatchManager.EliminationOrder = {}  -- victims pushed in death order; placement = TotalPlayers - #order + 1
+MatchManager.TotalPlayers = 0       -- snapshot at startMatch for placement math
 
 -- Player data store (per-match)
 local playerData = {}  -- [player] = { HP, Ammo, Coins, Weapon, Eliminated }
+
+-- Reward helper: routes through CurrencyService (which enforces per-match caps)
+-- and logs successful awards. Returns 0 if CurrencyService not loaded yet or capped.
+local function awardCoins(player, amount, category, reason)
+	if not _G.CurrencyService then return 0 end
+	local actual = _G.CurrencyService.addCoins(player, amount, category)
+	if actual > 0 then
+		print(string.format("[Reward] %s +%d coins (%s)", player.Name, actual, reason))
+	end
+	return actual
+end
+
+-- Quest helper: increments daily quest progress (silent if service not loaded)
+local function recordQuest(player, eventType, count)
+	if _G.DailyQuestService then
+		_G.DailyQuestService.recordEvent(player, eventType, count or 1)
+	end
+end
 
 function MatchManager.getPlayerData(player)
 	return playerData[player]
@@ -36,20 +56,37 @@ function MatchManager.setPhase(phase)
 end
 
 function MatchManager.initPlayerData(player)
+	-- Use player's chosen primary weapon (from shop equip) — fallback to STARTER_WEAPONS
+	-- if ShopService isn't loaded or hasn't loaded the player yet.
+	local defaultWeapon = GameConfig.STARTER_WEAPONS[1]
+	local equipped = (_G.ShopService and _G.ShopService.getPrimary(player)) or defaultWeapon
+	if not GameConfig.WEAPONS[equipped] then
+		equipped = defaultWeapon
+	end
+	if not GameConfig.WEAPONS[equipped] then
+		equipped = next(GameConfig.WEAPONS)
+		warn("[MatchManager] STARTER_WEAPONS[1] is invalid; falling back to " .. tostring(equipped))
+	end
+	local equippedCfg = GameConfig.WEAPONS[equipped]
+	if not equippedCfg then
+		error("[MatchManager] No valid weapons configured")
+	end
+
 	playerData[player] = {
 		HP = GameConfig.MAX_HP,
 		MaxHP = GameConfig.MAX_HP,
 		Ammo = 30,
 		Coins = 0,
-		Weapon = "Viper",  -- start with pistol
+		Weapon = equipped,
 		Eliminated = false,
 		ProtectedUntil = 0,  -- set after teleportToArena
 	}
-	-- Send initial HP
+	-- Send initial HP + ammo
 	local healthUpdate = events:WaitForChild("HealthUpdate")
 	healthUpdate:FireClient(player, GameConfig.MAX_HP, GameConfig.MAX_HP)
 	local ammoUpdate = events:WaitForChild("AmmoUpdate")
-	ammoUpdate:FireClient(player, 30, GameConfig.WEAPONS.Viper.MagSize)
+	ammoUpdate:FireClient(player, 30, equippedCfg.MagSize or 30)
+	events:WaitForChild("EquipWeapon"):FireClient(player, equipped)
 end
 
 -- Build a weapon Tool and parent it to the player's Character so Roblox's
@@ -102,10 +139,12 @@ function MatchManager.damagePlayer(player, damage, attacker)
 	else
 		-- NPC / environmental damage — honour spawn protection window
 		if data.ProtectedUntil and tick() < data.ProtectedUntil then
+			print(string.format("[damagePlayer] BLOCKED by spawn protection: %s (until t+%.1f)", player.Name, data.ProtectedUntil - tick()))
 			return
 		end
 	end
 
+	print(string.format("[damagePlayer] %s -%d (%d->%d) by %s", player.Name, damage, data.HP, data.HP-damage, isPlayerAttacker and attacker.Name or "NPC"))
 	data.HP = math.max(0, data.HP - damage)
 
 	local healthUpdate = events:WaitForChild("HealthUpdate")
@@ -131,6 +170,25 @@ function MatchManager.eliminatePlayer(player, killer)
 
 	data.Eliminated = true
 	MatchManager.AlivePlayers[player] = nil
+
+	-- Track elimination order for placement rewards. Placement is computed as
+	-- (TotalPlayers - #EliminationOrder + 1) — the Nth-to-last person dies in Nth-to-last place.
+	table.insert(MatchManager.EliminationOrder, player)
+	local placement = MatchManager.TotalPlayers - #MatchManager.EliminationOrder + 1
+	local rewards = GameConfig.ECONOMY.Rewards
+	if placement <= 3 then
+		awardCoins(player, rewards.PlacementTop3, nil, "Top 3 placement")
+		recordQuest(player, "Top3Placement", 1)
+	elseif placement <= 5 then
+		awardCoins(player, rewards.PlacementTop5, nil, "Top 5 placement")
+	end
+
+	-- Killer reward (PvP only — eliminate is also called for NPC deaths but those
+	-- have killer=NPC model not Player, so the IsA check filters correctly).
+	if killer and killer:IsA("Player") and killer ~= player then
+		awardCoins(killer, rewards.KillPlayer, "PlayerKills", "PvP kill on " .. player.Name)
+		recordQuest(killer, "PlayerKill", 1)
+	end
 
 	-- Announce elimination
 	PlayerEliminated:FireAllClients(player.Name)
@@ -202,6 +260,23 @@ function MatchManager.endMatch(winner)
 	MatchManager.MatchRunning = false
 	MatchManager.PvPEnabled = false
 
+	-- Winner gets the placement-1 bonus (in addition to MatchComplete below).
+	-- Last-alive winners aren't pushed onto EliminationOrder, so the placement
+	-- math in eliminatePlayer skips them — we award PlacementWin explicitly here.
+	local rewards = GameConfig.ECONOMY.Rewards
+	if winner then
+		awardCoins(winner, rewards.PlacementWin, nil, "Match win")
+	end
+
+	-- Match completion: everyone who was in the match (alive + eliminated) gets it.
+	-- We use playerData (still populated until resetToLobby) to identify match participants.
+	for player, _ in pairs(playerData) do
+		if player.Parent then  -- still connected
+			awardCoins(player, rewards.MatchComplete, nil, "Match complete")
+			recordQuest(player, "MatchComplete", 1)
+		end
+	end
+
 	if winner then
 		Announcement:FireAllClients(winner.Name .. " WINS!")
 	else
@@ -259,10 +334,16 @@ function MatchManager.startMatch()
 	if MatchManager.MatchRunning then return end
 	MatchManager.MatchRunning = true
 
-	-- Initialize all current players
+	-- Reset placement tracking and snapshot player count for placement math
+	MatchManager.EliminationOrder = {}
+	MatchManager.TotalPlayers = #Players:GetPlayers()
+
+	-- Initialize all current players + reset their per-match earning caps so
+	-- the previous match's cap doesn't leak into this one.
 	for _, player in ipairs(Players:GetPlayers()) do
 		MatchManager.initPlayerData(player)
 		MatchManager.AlivePlayers[player] = true
+		if _G.CurrencyService then _G.CurrencyService.resetMatchCaps(player) end
 	end
 
 	Announcement:FireAllClients("MATCH STARTING...")
@@ -292,9 +373,21 @@ function MatchManager.startMatch()
 	-- Spawn NPCs (handled by NPCSystem listening to phase)
 	-- Spawn loot (handled by LootSystem listening to phase)
 
+	-- Survival reward: every 60s elapsed, give SurvivePerMin to all currently alive
+	-- players. Counted in PvE phase only here; you could extend to PvP if desired.
+	local survivalRate = GameConfig.ECONOMY.Rewards.SurvivePerMin
 	for t = GameConfig.PVE_DURATION, 1, -1 do
 		if not MatchManager.MatchRunning then return end
 		TimerUpdate:FireAllClients(t)
+		local elapsed = GameConfig.PVE_DURATION - t + 1
+		if elapsed % 60 == 0 then
+			for player, _ in pairs(MatchManager.AlivePlayers) do
+				if player.Parent then
+					awardCoins(player, survivalRate, "Survival", "Survived 1 minute")
+					recordQuest(player, "SurviveSeconds", 60)
+				end
+			end
+		end
 		task.wait(1)
 	end
 
@@ -352,6 +445,7 @@ end)
 events:WaitForChild("FireWeapon").OnServerEvent:Connect(function(player, origin, direction, weaponName)
 	local data = playerData[player]
 	if not data or data.Eliminated then return end
+	if weaponName ~= data.Weapon then return end
 
 	local config = GameConfig.WEAPONS[weaponName]
 	if not config then return end
@@ -389,11 +483,15 @@ events:WaitForChild("FireWeapon").OnServerEvent:Connect(function(player, origin,
 				if hitPlayer then
 					MatchManager.damagePlayer(hitPlayer, config.Damage, player)
 				else
-					-- It's an NPC - let NPCSystem handle death via HP attribute listener
+					-- It's an NPC - let NPCSystem handle death via HP attribute listener.
+					-- Stamp LastAttackerId so NPCSystem.dropLoot can credit the kill bonus
+					-- to the correct player. UserId (number) is used because Instance refs
+					-- can't be stored in attributes.
 					local npcHP = hitChar:GetAttribute("HP")
 					if npcHP then
 						npcHP = npcHP - config.Damage
 						hitChar:SetAttribute("HP", npcHP)
+						hitChar:SetAttribute("LastAttackerId", player.UserId)
 						-- Tell clients to flash the NPC and float a damage number
 						events.NPCDamaged:FireAllClients(hitChar, config.Damage, result.Position)
 					end

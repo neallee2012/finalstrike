@@ -54,7 +54,7 @@ local function spawnMuzzleFlash(muzzle)
 	Debris:AddItem(flash, 0.15)
 end
 
-local currentWeapon = "Viper"
+local currentWeapon = GameConfig.STARTER_WEAPONS[1]
 local canFire = true
 local isReloading = false
 local isFiring = false
@@ -90,8 +90,23 @@ local function fireWeapon()
 	-- before server attaches weapon model on respawn).
 	local muzzle = getMuzzle()
 	local origin = muzzle and muzzle.WorldPosition or head.Position
-	local unitRay = camera:ScreenPointToRay(mouse.X, mouse.Y)
-	local direction = unitRay.Direction
+
+	-- Two-stage aim (fixes #8): the muzzle is offset from the camera (right
+	-- hand vs head/eye position), so firing FROM muzzle along the camera's ray
+	-- direction puts shots noticeably off the crosshair. Instead:
+	--   1. Cast from the camera along the screen-pointer ray to find what the
+	--      crosshair is actually over (or a far point if it hits nothing).
+	--   2. Aim from the muzzle TOWARD that point — bullets now follow the
+	--      crosshair regardless of muzzle offset.
+	local screenRay = camera:ScreenPointToRay(mouse.X, mouse.Y)
+	local aimParams = RaycastParams.new()
+	aimParams.FilterType = Enum.RaycastFilterType.Exclude
+	aimParams.FilterDescendantsInstances = { character }
+	local maxRange = config.Range or 500
+	local aimResult = workspace:Raycast(screenRay.Origin, screenRay.Direction * maxRange, aimParams)
+	local targetPos = aimResult and aimResult.Position
+		or (screenRay.Origin + screenRay.Direction * maxRange)
+	local direction = (targetPos - origin).Unit
 
 	-- Local muzzle flash for the local player (server's WeaponHit handles the
 	-- impact spark; this is the gun-end of the shot).

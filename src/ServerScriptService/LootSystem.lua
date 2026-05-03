@@ -10,12 +10,7 @@ local events = ReplicatedStorage:WaitForChild("GameEvents")
 local LootSystem = {}
 local activeLoot = {}
 
-local WEAPON_LIST = {}
-for name, _ in pairs(GameConfig.WEAPONS) do
-	table.insert(WEAPON_LIST, name)
-end
-
-local function createPickup(lootType, position, weaponName)
+local function createPickup(lootType, position)
 	local part = Instance.new("Part")
 	part.Name = lootType .. "Pickup"
 	part.Anchored = true
@@ -31,10 +26,6 @@ local function createPickup(lootType, position, weaponName)
 		part.Color = Color3.fromRGB(50, 255, 100)
 	elseif lootType == "Coin" then
 		part.Color = Color3.fromRGB(255, 215, 0)
-	elseif lootType == "Weapon" then
-		part.Color = Color3.fromRGB(150, 100, 255)
-		weaponName = weaponName or WEAPON_LIST[math.random(#WEAPON_LIST)]
-		part:SetAttribute("WeaponName", weaponName)
 	end
 	part.Material = Enum.Material.Neon
 
@@ -73,13 +64,11 @@ local function createPickup(lootType, position, weaponName)
 			mm.healPlayer(player, GameConfig.LOOT.Medkit.Heal)
 		elseif lootType == "Coin" then
 			data.Coins = data.Coins + GameConfig.LOOT.Coin.Amount
-		elseif lootType == "Weapon" then
-			local wn = part:GetAttribute("WeaponName")
-			if wn then
-				data.Weapon = wn
-				events.EquipWeapon:FireClient(player, wn)
-				mm.attachWeapon(player, wn)
-			end
+		end
+
+		-- Quest progress: any loot pickup counts toward "拾取 5 個戰利品"
+		if _G.DailyQuestService then
+			_G.DailyQuestService.recordEvent(player, "LootPickup", 1)
 		end
 
 		events.LootPickedUp:FireClient(player, lootType, 1)
