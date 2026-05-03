@@ -58,8 +58,19 @@ end
 function MatchManager.initPlayerData(player)
 	-- Use player's chosen primary weapon (from shop equip) — fallback to STARTER_WEAPONS
 	-- if ShopService isn't loaded or hasn't loaded the player yet.
-	local equipped = (_G.ShopService and _G.ShopService.getPrimary(player)) or GameConfig.STARTER_WEAPONS[1]
-	local equippedCfg = GameConfig.WEAPONS[equipped] or GameConfig.WEAPONS[GameConfig.STARTER_WEAPONS[1]]
+	local defaultWeapon = GameConfig.STARTER_WEAPONS[1]
+	local equipped = (_G.ShopService and _G.ShopService.getPrimary(player)) or defaultWeapon
+	if not GameConfig.WEAPONS[equipped] then
+		equipped = defaultWeapon
+	end
+	if not GameConfig.WEAPONS[equipped] then
+		equipped = next(GameConfig.WEAPONS)
+		warn("[MatchManager] STARTER_WEAPONS[1] is invalid; falling back to " .. tostring(equipped))
+	end
+	local equippedCfg = GameConfig.WEAPONS[equipped]
+	if not equippedCfg then
+		error("[MatchManager] No valid weapons configured")
+	end
 
 	playerData[player] = {
 		HP = GameConfig.MAX_HP,
@@ -75,6 +86,7 @@ function MatchManager.initPlayerData(player)
 	healthUpdate:FireClient(player, GameConfig.MAX_HP, GameConfig.MAX_HP)
 	local ammoUpdate = events:WaitForChild("AmmoUpdate")
 	ammoUpdate:FireClient(player, 30, equippedCfg.MagSize or 30)
+	events:WaitForChild("EquipWeapon"):FireClient(player, equipped)
 end
 
 -- Build a weapon Tool and parent it to the player's Character so Roblox's
@@ -433,6 +445,7 @@ end)
 events:WaitForChild("FireWeapon").OnServerEvent:Connect(function(player, origin, direction, weaponName)
 	local data = playerData[player]
 	if not data or data.Eliminated then return end
+	if weaponName ~= data.Weapon then return end
 
 	local config = GameConfig.WEAPONS[weaponName]
 	if not config then return end
