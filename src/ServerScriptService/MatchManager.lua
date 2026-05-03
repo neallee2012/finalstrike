@@ -58,11 +58,10 @@ end
 function MatchManager.setPhase(phase)
 	MatchManager.CurrentPhase = phase
 	PhaseChanged:FireAllClients(phase)
-	-- Phases without an active countdown should clear the timer label (#6).
-	-- PvE / PvPWarning push their own per-second TimerUpdate, the others don't.
-	if phase == GameConfig.PHASE.PVP
-		or phase == GameConfig.PHASE.MATCH_END
-		or phase == GameConfig.PHASE.LOBBY then
+	-- Phases without an active countdown clear the timer label.
+	-- PvE / PvPWarning / PvP all push their own per-second TimerUpdate now (#19),
+	-- so only MATCH_END / LOBBY need the explicit zero clear.
+	if phase == GameConfig.PHASE.MATCH_END or phase == GameConfig.PHASE.LOBBY then
 		TimerUpdate:FireAllClients(0)
 	end
 	print("[MatchManager] Phase:", phase)
@@ -233,6 +232,12 @@ function MatchManager.eliminatePlayer(player, killer)
 				player.Character.HumanoidRootPart.CFrame = specSpawn.CFrame + Vector3.new(0, 3, 0)
 			end
 		end
+		-- Reset HUD HP back to full so the HP bar in the spectator/lobby view
+		-- shows 100/100 instead of the 0/100 from when they died (#18). The
+		-- per-match playerData is left as Eliminated=true so they can't fight
+		-- back this match.
+		data.HP = data.MaxHP
+		events:WaitForChild("HealthUpdate"):FireClient(player, data.MaxHP, data.MaxHP)
 	end)
 
 	-- Check win condition
@@ -308,7 +313,9 @@ function MatchManager.resetToLobby()
 	MatchManager.PvPEnabled = false
 	playerData = {}
 
-	-- Teleport all players to lobby
+	-- Teleport all players to lobby + reset HUD HP back to full (#18) so the
+	-- HP bar doesn't keep showing whatever it was at when the match ended.
+	local healthUpdate = events:WaitForChild("HealthUpdate")
 	for _, player in ipairs(Players:GetPlayers()) do
 		player:LoadCharacter()
 		task.wait(0.5)
@@ -320,6 +327,7 @@ function MatchManager.resetToLobby()
 				player.Character.HumanoidRootPart.CFrame = lobbySpawn.CFrame + Vector3.new(0, 3, 0)
 			end
 		end
+		healthUpdate:FireClient(player, GameConfig.MAX_HP, GameConfig.MAX_HP)
 	end
 
 	Announcement:FireAllClients("WAITING FOR MATCH...")
@@ -420,7 +428,23 @@ function MatchManager.startMatch()
 	MatchManager.PvPEnabled = true
 	Announcement:FireAllClients("⚔ FINAL STRIKE - LAST ONE STANDING WINS ⚔")
 
-	-- PvP runs until someone wins (checkWinCondition handles it)
+	-- PvP has a 5-minute cap (#19). Whoever's alive when time runs out wins;
+	-- if everyone died, the match ends with NO SURVIVORS. checkWinCondition
+	-- can also end the match early once aliveCount drops to 1.
+	for t = GameConfig.PVP_DURATION, 1, -1 do
+		if not MatchManager.MatchRunning then return end
+		TimerUpdate:FireAllClients(t)
+		task.wait(1)
+	end
+
+	if MatchManager.MatchRunning then
+		-- Time ran out — pick first surviving player as winner
+		local winner = nil
+		for p, _ in pairs(MatchManager.AlivePlayers) do
+			if p.Parent then winner = p; break end
+		end
+		MatchManager.endMatch(winner)
+	end
 end
 
 -- ============ LOBBY TRIGGER ============

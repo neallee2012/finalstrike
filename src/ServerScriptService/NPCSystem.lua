@@ -5,9 +5,21 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local PathfindingService = game:GetService("PathfindingService")
+local ServerStorage = game:GetService("ServerStorage")
 
 local GameConfig = require(ReplicatedStorage:WaitForChild("GameConfig"))
+local WeaponMeshes = require(ServerStorage:WaitForChild("WeaponMeshes"))
 local events = ReplicatedStorage:WaitForChild("GameEvents")
+
+-- NPC weapon loadout by enemy type (#20). Picks an existing GameConfig weapon
+-- whose mesh fits the NPC's role (Patrol = pistol, Armored = SMG, Elite = rifle).
+-- The weapon is purely visual + drives muzzle flash position; damage still
+-- comes from GameConfig.ENEMIES[type].Damage in the AI loop.
+local NPC_WEAPON = {
+	Patrol  = "Viper Mk1",       -- pistol
+	Armored = "Stinger Mk2",     -- SMG
+	Elite   = "Phantom Ranger",  -- rifle
+}
 
 local NPCSystem = {}
 local activeNPCs = {}
@@ -142,6 +154,16 @@ local function createR15NPC(enemyType, position)
 
 	-- Per-type silhouette accessories (helmet, vest, hood, etc.)
 	dressNPC(model, enemyType)
+
+	-- Equip a visible weapon Tool so players can see what each NPC type carries (#20).
+	-- Weapon is purely visual: damage still comes from config.Damage in the AI loop.
+	local weaponName = NPC_WEAPON[enemyType]
+	if weaponName then
+		local tool = WeaponMeshes.build(weaponName)
+		if tool then
+			tool.Parent = model  -- Tool parented to character auto-equips and grips in RightHand
+		end
+	end
 
 	-- Position so feet land just above the floor; Humanoid HipHeight handles
 	-- the rest. The marker sits at y=1 (above ArenaFloor at y=0); pivot the
@@ -371,6 +393,18 @@ local function runNPCAI(npcModel)
 					if mm then
 						mm.damagePlayer(closestPlayer, npcModel:GetAttribute("Damage"))
 					end
+					-- Fire visual flash + tracer to all clients (#20). Origin = NPC's
+					-- weapon Muzzle attachment if present; falls back to Head position.
+					local muzzlePos = root.Position + Vector3.new(0, 1.5, 0)  -- chest-level fallback
+					local tool = npcModel:FindFirstChildOfClass("Tool")
+					local handle = tool and tool:FindFirstChild("Handle")
+					local muzzle = handle and handle:FindFirstChild("Muzzle")
+					if muzzle then muzzlePos = muzzle.WorldPosition end
+					local targetPos = closestPlayer.Character
+						and closestPlayer.Character:FindFirstChild("HumanoidRootPart")
+						and closestPlayer.Character.HumanoidRootPart.Position
+						or (root.Position + Vector3.new(0, 1.5, 0))
+					events.NPCFireWeapon:FireAllClients(npcModel, muzzlePos, targetPos)
 				end
 			else
 				-- Chase via PathfindingService so NPCs route around cover
