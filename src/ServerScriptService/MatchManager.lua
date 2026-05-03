@@ -479,6 +479,10 @@ events:WaitForChild("FireWeapon").OnServerEvent:Connect(function(player, origin,
 		local dir = (direction.Unit + spread).Unit * config.Range
 
 		local result = workspace:Raycast(origin, dir, rayParams)
+		-- Per-shot debug log so #13 (crosshair miss) can be traced post-mortem
+		print(string.format("[Fire] %s %s hit=%s",
+			player.Name, weaponName,
+			result and (result.Instance:GetFullName() .. " @ " .. tostring(result.Position)) or "MISS"))
 		if result then
 			local hitPart = result.Instance
 			local hitChar = hitPart.Parent

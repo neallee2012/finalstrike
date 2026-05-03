@@ -42,6 +42,9 @@ local function ensureLeftHandIK(char, tool)
 	ik.EndEffector = leftHand
 	ik.Target = leftGrip  -- IKControl accepts Attachment targets
 	ik.Weight = 1.0
+	-- High Priority so the jump animation's LeftArm tracks don't override the
+	-- grip pose — without this, hand pops off the gun mid-jump (#12).
+	ik.Priority = 1000
 	ik.Parent = humanoid
 end
 

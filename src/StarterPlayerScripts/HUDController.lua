@@ -15,6 +15,11 @@ local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "FinalStrikeHUD"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+-- IgnoreGuiInset=true so the crosshair at UDim2(0.5, _, 0.5, _) aligns with
+-- camera.CFrame.LookVector (real viewport center). Without this, the crosshair
+-- sits ~18px below true center because of the top-bar inset, and shots aim
+-- slightly above what the player thinks they're targeting (#13).
+screenGui.IgnoreGuiInset = true
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
 -- === HP BAR ===

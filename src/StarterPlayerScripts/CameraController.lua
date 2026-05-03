@@ -24,6 +24,7 @@ local INTERACTIVE_UIS = {
 }
 
 local inArena = false  -- set true on PvE/PvPWarning/PvP, false on Lobby/MatchEnd
+local localEliminated = false  -- true after this player dies; cleared on next match start
 
 local function isAnyInteractiveUIOpen()
 	local pg = player:FindFirstChild("PlayerGui")
@@ -37,7 +38,9 @@ local function isAnyInteractiveUIOpen()
 end
 
 local function shouldLock()
-	return inArena and not isAnyInteractiveUIOpen()
+	-- Eliminated players spectate in third-person (#11). Phase still says PvP
+	-- because the match continues — local elimination is tracked separately.
+	return inArena and not localEliminated and not isAnyInteractiveUIOpen()
 end
 
 local function applyCameraState()
@@ -62,10 +65,23 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
--- Phase changes drive arena state
+-- Phase changes drive arena state. PvE start of a new match clears the
+-- local-elimination flag so the player drops back into first-person.
 events:WaitForChild("PhaseChanged").OnClientEvent:Connect(function(phase)
 	inArena = (phase == "PvE" or phase == "PvPWarning" or phase == "PvP")
+	if phase == "PvE" then
+		localEliminated = false
+	end
 	applyCameraState()
+end)
+
+-- Server fires PlayerEliminated to all clients with the victim name; we only
+-- care if it's us — flip to spectator camera for the rest of the match (#11).
+events:WaitForChild("PlayerEliminated").OnClientEvent:Connect(function(victimName)
+	if victimName == player.Name then
+		localEliminated = true
+		applyCameraState()
+	end
 end)
 
 -- Watch for shop/quest UI toggles so we release/recapture the mouse correctly.
