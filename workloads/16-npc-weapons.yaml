@@ -19,13 +19,16 @@ purpose: |
 
 # ============= 規格 =============
 npc_weapon_assignment:
-  source: NPCSystem.createR15NPC
-  rule: "依 EnemyType 對應一把武器（從 GameConfig.WEAPONS 抽）"
-  current_mapping_estimate: |
-    （main commit 253863f 實作 — 待 receipt 確認實際對應）
-    Patrol → Common Pistol/SMG
-    Armored → Uncommon Rifle
-    Elite → Rare/Epic Rifle/Shotgun
+  source: NPCSystem.lua line 18-22 (NPC_WEAPON table)
+  rule: "依 EnemyType 對應一把固定武器"
+  exact_mapping:
+    Patrol:  "Viper Mk1"        # Common Pistol
+    Armored: "Stinger Mk2"      # Uncommon SMG
+    Elite:   "Phantom Ranger"   # Uncommon Rifle
+  rationale: |
+    所有 NPC 用 Common/Uncommon 武器，故意「不給 NPC 高稀有度武器」—
+    避免 Elite NPC 用 Demon Wraith Abyss 一發秒殺玩家。
+    NPC 強度差異化靠 HP / Damage / AI 速度，不靠武器稀有度。
   attach_method: |
     Tool 直接 parent 到 NPC character — Roblox 內建 tool-hold animation
     自動套用，跟玩家路徑一致。
