@@ -113,8 +113,9 @@ sprint_8b_changes:
     - implement: MatchManager FireWeapon handler 加 config.Type=="Sniper" headshot 分支
     - verify: Common Pistol (Viper Mk1) 對 200 HP 玩家 TTK 落在 2.5–3.0s
     - verify: Demon vs Common DPS 比 ≤ 1.9x
-    - verify: Wraith Hunter (Rare) 爆頭一發秒殺 200 HP 玩家
-    - verify: Wraith Scout (Uncommon) 爆頭兩發殺 200 HP 玩家（仍非秒殺，rarity 設計）
+    - verify: post-(b) Wraith Scout (Uncommon) 爆頭一發秒殺 200 HP 玩家（D1，body 120 × 2.0x = 240）
+    - verify: post-(b) Wraith Hunter (Rare) 爆頭一發秒殺 200 HP 玩家（body 172 × 2.0x = 344）
+    - verify: post-(b) 全 5 把 Sniper 對 200 HP 玩家爆頭都秒殺（D1）
     - verify: 其他 Type 命中 Head = 一般傷害
 
   new_success_criteria:
