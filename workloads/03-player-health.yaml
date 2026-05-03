@@ -1,7 +1,8 @@
 name: PlayerHealth
 owner: claude-code
 priority: P0-prototype
-status: ✅ DONE (Sprint 2) | 🔄 REBALANCE PLANNED (Sprint 8b — 200 HP)
+status: ✅ DONE (Sprint 2) | ✅ REBALANCED (Sprint 8b — 200 HP, 2026-05-03)
+sprint_8b_receipt: receipts/sprint-8b-200hp-rebalance.md
 
 # ============= Sprint 8b 計劃中的修改（CEO 決議 b 後重寫 2026-05-03） =============
 # 詳見 proposals/sprint-8-200hp-balance.md

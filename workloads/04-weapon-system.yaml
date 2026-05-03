@@ -1,7 +1,8 @@
 name: WeaponSystem
 owner: claude-code
 priority: P0-prototype
-status: ✅ DONE (Sprint 3 + Sprint 7 visual) | 🔄 REBALANCE PLANNED (Sprint 8)
+status: ✅ DONE (Sprint 3 + Sprint 7 visual + Sprint 8b 30-weapon retune + Sniper headshot, 2026-05-03)
+sprint_8b_receipt: receipts/sprint-8b-200hp-rebalance.md
 
 # ============= Sprint 8b 計劃中的修改（CEO 決議 b 後重寫 2026-05-03） =============
 # 詳見 proposals/sprint-8-200hp-balance.md §3.5 + §4.2
