@@ -3,82 +3,108 @@ owner: claude-code
 priority: P0-prototype
 status: ✅ DONE (Sprint 3 + Sprint 7 visual) | 🔄 REBALANCE PLANNED (Sprint 8)
 
-# ============= Sprint 8 計劃中的修改 =============
-# 詳見 proposals/sprint-8-200hp-balance.md §4.2 + §3.5
-sprint_8_changes:
-  goal: "玩家 200 HP 後，6 把武器 TTK 重新調整，維持各武器定位 + Wraith headshot 機制"
-  damage_table:
-    Viper:   { current: 25, target: 35,  ttk_vs_200hp: "2.4s (6 shots)",   role: "半自動手槍 / 起手武器" }
-    Stinger: { current: 15, target: 20,  ttk_vs_200hp: "0.86s (10 shots)", role: "全自動 SMG / 近戰壓制",
-               note: "微偏離提案 18 → 20，避免 SMG TTK 落後 Phantom 太多 — 待 CEO 確認" }
-    Phantom: { current: 30, target: 45,  ttk_vs_200hp: "0.75s (5 shots)",  role: "全自動步槍 / 主力" }
-    Thunder: { current: 12, target: 13,  ttk_vs_200hp: "近距 1 發 / 中距 2-3 發",
-               role: "霰彈 10 pellets（從 8 提高）",
-               pellets_change: "8 → 10",
-               total_damage: { close: 130, mid: "60-90", far: "20-40" },
-               mechanism: "spread 自然散落，不新增距離 falloff",
-               status: "✅ Q2 RESOLVED 2026-05-03" }
-    Wraith:  { current: 90, target_body: 150, target_headshot: 200,
-               ttk_vs_200hp: "身體 2 發 (1.5s) / 爆頭 1 發",
-               role: "狙擊 / 精準爆頭秒殺",
-               mechanism: "新增 headshot 偵測（hitPart.Name == 'Head'）",
-               status: "✅ Q1 RESOLVED 2026-05-03" }
-    Fang:    { current: 40, target: 60,  ttk_vs_200hp: "2.0s (4 hits)",    role: "近戰 / 高風險高傷害" }
-  fire_rate: "不動，全部維持現值"
-  mag_size: "不動"
-  reload_time: "不動"
-  spread: "Thunder 維持 0.1（不動），playtest 後若中遠距落點偏離期望再 tune"
+# ============= Sprint 8b 計劃中的修改（CEO 決議 b 後重寫 2026-05-03） =============
+# 詳見 proposals/sprint-8-200hp-balance.md §3.5 + §4.2
+#
+# CEO 拍板路線 (b)：「重新校 30 武器的 DPS 公式，讓 Common→Demon 的 TTK 差距收斂」
+#
+# 注意：此 contract 原寫成「6 把武器 rebalance」是基於 Sprint 7 之前的舊狀態。
+# main 上已有 30 武器 × 6 個稀有度。Sprint 8a 衛生補課完成後執行 Sprint 8b。
 
-  # Sprint 8 新工程：Wraith Headshot 偵測
-  headshot_system:
-    scope: "ONLY Wraith — 不擴展全武器"
+sprint_8b_changes:
+  goal: "30 武器 DPS 公式收斂 + Sniper Type-based headshot + 200 HP 適配"
+
+  # ---------- (b) 30 武器 DPS 公式收斂 ----------
+  rarity_dps_retune:
+    current_multipliers: { Common: 1.00, Uncommon: 1.25, Rare: 1.55, Epic: 1.95, Legendary: 2.40, Demon: 3.00 }
+    new_multipliers:     { Common: 1.00, Uncommon: 1.15, Rare: 1.30, Epic: 1.50, Legendary: 1.70, Demon: 1.90 }
+    common_to_demon_gap: { current: 3.00, new: 1.90, reduction_pct: 37 }
     rationale: |
-      全武器爆頭 1.5x/2x 是 FPS 標準但會打亂 TTK 表
-      （Phantom 5 發殺變 3 發），影響面太大。
-      CEO 訊息只描述 Wraith 爆頭。Sprint 9+ 評估擴展。
+      CEO 拍板路線 (b)：商店付費差距從 3x DPS 收斂到 1.9x DPS。
+      新玩家在 200 HP 下不被 Demon 武器碾壓，但 Demon 仍維持「最強」感受。
+    common_baseline_targets:
+      Pistol:   { ttk_vs_200hp: "2.5–3.0s",  dps: "67–80" }
+      SMG:      { ttk_vs_200hp: "1.5–2.0s",  dps: "100–133", note: "Common 無 SMG，Stinger 起跳 Uncommon" }
+      Rifle:    { ttk_vs_200hp: "1.5–2.0s",  dps: "100–133", note: "Common 無 Rifle，Phantom 起跳 Uncommon" }
+      Shotgun:  { ttk_vs_200hp: "0.8–1.5s 近距", dps: "130–250" }
+      Sniper:   { ttk_vs_200hp: "1.5–2.0s 單發", dps: "100–133", note: "Common 無 Sniper" }
+      Knife:    { ttk_vs_200hp: "1.5–2.5s",  dps: "80–133" }
+      Minigun:  { ttk_vs_200hp: "—", dps: "—", note: "Hailstorm Legendary 唯一" }
+    formula: "新 Damage = Common baseline DPS × 新 rarity 倍率 × FireRate（per pellet 或 per shot）"
+    deliverable_before_implementation: |
+      Claude 在 Sprint 8b 開工前提交 proposals/30-weapon-dps-retune.md，
+      列出 30 武器逐一的新 Damage 值給 CEO 一次拍板。
+
+  # ---------- Sniper Type-based Headshot ----------
+  headshot_system:
+    scope: "ONLY config.Type == 'Sniper' — 5 把 Wraith 系列"
+    multiplier_proposed: 2.0
+    multiplier_options:
+      A: { value: 1.33, common_to_demon_1shot: false, evaluation: "嚴格遵守 CEO 200/150 比例，過保守" }
+      B: { value: 2.00, common_to_demon_1shot: "Rare+", evaluation: "FPS 標準；推薦 — Rare 起跳 1 發爆頭" }
+      C: { value: "+200 fixed", evaluation: "全部 1-shot，模糊稀有度差距" }
+    rationale_for_type_based: |
+      Reconciliation 2026-05-03：原 contract 寫 'weaponName == "Wraith"'
+      但 main 已有 5 把 Sniper（Wraith Scout/Hunter/Frost/Apex/Abyss）。
+      改用 config.Type=="Sniper" 涵蓋所有 5 把。
     detection: |
-      MatchManager.lua FireWeapon handler 內 raycast result 後：
+      MatchManager.lua FireWeapon handler：
       local isHeadshot = result.Instance.Name == "Head"
-      if weaponName == "Wraith" and isHeadshot then
-          damage = config.HeadshotDamage  -- 200
-      else
-          damage = config.Damage  -- 150
+      if config.Type == "Sniper" and isHeadshot then
+          damage = damage * GameConfig.HEADSHOT_MULTIPLIER  -- 2.0
       end
     config_addition: |
-      GameConfig.WEAPONS.Wraith.HeadshotDamage = 200
+      GameConfig.HEADSHOT_MULTIPLIER = 2.0
+      （不再為單一武器加 HeadshotDamage 欄位）
+    sniper_headshot_table_at_2x:
+      "Wraith Scout":  { rarity: Uncommon,  body_after_b: "TBD", headshot_at_2x: "TBD body * 2", oneshot_200hp: false }
+      "Wraith Hunter": { rarity: Rare,      body_after_b: "TBD", headshot_at_2x: "TBD body * 2", oneshot_200hp: true }
+      "Wraith Frost":  { rarity: Epic,      body_after_b: "TBD", headshot_at_2x: "TBD body * 2", oneshot_200hp: true }
+      "Wraith Apex":   { rarity: Legendary, body_after_b: "TBD", headshot_at_2x: "TBD body * 2", oneshot_200hp: true }
+      "Wraith Abyss":  { rarity: Demon,     body_after_b: "TBD", headshot_at_2x: "TBD body * 2", oneshot_200hp: true, special: "Pierce=true" }
     npc_compat: |
-      R15 NPC 也有 Head part，命名一致 → 玩家 vs NPC 也適用
-      但 NPC 戴的 hat/hood/helmet accessory 命中時不算 headshot
-      （hitPart.Name 不是 "Head"）— 嚴格 Head part only
-    edge_cases:
-      - "Patrol 警衛帽（cap accessory）擋下 → 算非爆頭，傷害 150 → Patrol 120 HP 一發殺"
-      - "Armored 戰術頭盔（helmet accessory）擋下 → 算非爆頭，傷害 150 → 仍要 2 發"
-      - "Elite 兜帽（hood accessory）擋下 → 算非爆頭"
-    visual_polish_optional: "killfeed 顯示 'HEADSHOT' 標記 — Sprint 9 candidate"
+      R15 NPC 也有 Head part，命名一致 → 玩家 vs NPC 也適用。
+      NPC 戴的 hat/hood/helmet accessory 命中時 hitPart.Name 不是 "Head" → 不算爆頭（合理）。
+    excluded_types: "Pistol, SMG, Rifle, Shotgun, Knife, Minigun — 命中 Head = 一般傷害"
+    excluded_rationale: "Sprint 8b 不擴展全武器爆頭機制；Sprint 9 可評估"
+
+  # ---------- 不動的部分 ----------
+  unchanged:
+    fire_rate: "全部 30 武器維持現值"
+    mag_size: "全部 30 武器維持現值"
+    reload_time: "全部 30 武器維持現值"
+    pellets: "Shotgun 系列各武器 Pellets 數維持（6/8/8/9/8/8/8 不一）"
+    spread: "全部維持現值；playtest 後若中遠距落點偏離期望再 tune"
+    special_mechanics: "Phantom Whisper Silent / Phantom Hellfire Burn / Wraith Abyss Pierce 維持"
 
   stages:
-    - define: 6 把武器新傷害值 + Wraith headshot 機制
-    - implement: GameConfig.WEAPONS 改 Damage + 新增 Wraith.HeadshotDamage
-    - implement: GameConfig.WEAPONS.Thunder Pellets 8 → 10
-    - implement: MatchManager FireWeapon handler 加 hitPart.Name=="Head" 分支（Wraith only）
-    - verify: Wraith body shot vs Patrol（120 HP）→ 1 發殺（150 > 120）
-    - verify: Wraith head shot vs Armored（300 HP）→ 200 dmg（剩 100），第二發再殺
-    - verify: Wraith body shot vs 玩家（200 HP）→ 剩 50 HP（仍存活）
-    - verify: Wraith head shot vs 玩家（200 HP）→ 0 HP（一發秒殺）
-    - verify: 其他 5 把武器命中 Head part = 一般傷害（不加成）
-    - verify: Thunder 近距全中總傷害 130 ±10、遠距散落 20-40
-    - verify: 在 Studio playtest 各武器空槍對 NPC 計算實際 TTK 落在容差內
+    - define: 新 RARITY 倍率 + Common baseline DPS（per Type）
+    - define: HEADSHOT_MULTIPLIER 數值（待 CEO 拍板 2.0x）
+    - deliverable: Claude 提交 proposals/30-weapon-dps-retune.md（30 武器逐一 Damage 新值）
+    - implement: GameConfig.RARITY 倍率改為 1.0/1.15/1.30/1.50/1.70/1.90
+    - implement: GameConfig.WEAPONS 30 把 Damage 按公式更新
+    - implement: GameConfig.HEADSHOT_MULTIPLIER = 2.0 新增
+    - implement: MatchManager FireWeapon handler 加 config.Type=="Sniper" headshot 分支
+    - verify: Common Pistol (Viper Mk1) 對 200 HP 玩家 TTK 落在 2.5–3.0s
+    - verify: Demon vs Common DPS 比 ≤ 1.9x
+    - verify: Wraith Hunter (Rare) 爆頭一發秒殺 200 HP 玩家
+    - verify: Wraith Scout (Uncommon) 爆頭兩發殺 200 HP 玩家（仍非秒殺，rarity 設計）
+    - verify: 其他 Type 命中 Head = 一般傷害
 
   new_success_criteria:
-    - 6 把武器 TTK 落在表格 ±0.2s（fire rate 不變所以可預測）
-    - Wraith 身體 150 / 爆頭 200，server 端正確分流
-    - 其他武器爆頭傷害 = 一般傷害（無加成 — 嚴格 scope control）
-    - Thunder 10 pellets × 13 dmg，近距全中 130
-    - Stinger 換彈次數從 0.5 換 / 殺 → 0.33 換 / 殺，有壓制感
+    - "30 武器 Damage 落在新 Rarity DPS 公式 ±5%"
+    - "Common→Demon DPS gap 從 3.0x → 1.9x"
+    - "Sniper Type 5 把全部套用 HEADSHOT_MULTIPLIER"
+    - "其他 Type 命中 Head = 一般傷害（嚴格 scope control）"
+    - "Common 武器對 200 HP TTK 落在 2.5–3.0s"
 
   decision_pending:
-    - "Stinger 採 20 dmg 還是嚴格照提案 18"
-    - "Thunder spread 是否需要從 0.1 調整以達到中遠距期望範圍（playtest 後決定）"
+    - "HEADSHOT_MULTIPLIER 確認 2.0x（推薦 B）"
+    - "30-weapon-dps-retune.md follow-up doc 等 Claude 提交，CEO 一次拍板"
+
+  withdrawn:
+    - "Stinger 微調 18 → 20（main 上有 4 把 Stinger，個別調整不適合，全部走 (b) 公式 retune）"
+    - "Thunder Pellets 8 → 10（main 上 7 把 Shotgun 各自不同 Pellets，不批量改）"
 
 # ============= 已完成的歷史 =============
 stages:

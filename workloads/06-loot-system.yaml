@@ -14,9 +14,14 @@ sprint_8_changes:
     MedkitFull:   { heal: 200, rarity: "極稀有", color: "Color3.fromRGB(255, 255, 200)", source: "Elite 5% drop（暫定）" }
   config_addition:
     GameConfig.LOOT.MedkitSmall: { Heal: 50 }
-    GameConfig.LOOT.Medkit:      { Heal: 100 }
+    GameConfig.LOOT.Medkit:      { Heal: 100 }   # 標準級從 50 → 100（200 HP 適配）
     GameConfig.LOOT.MedkitLarge: { Heal: 150 }
     GameConfig.LOOT.MedkitFull:  { Heal: 200 }
+  weapon_pickup_status: |
+    Reconciliation 2026-05-03: main commit 5928547 已移除 weapon drop（GameConfig.LOOT 註解
+    "Weapon dropped removed — weapons are shop-only now"）。
+    Sprint 8b 不重新加 weapon drop。武器流程：商店購買 → ShopService.EquipPrimaryWeapon →
+    server-side 持久化 → 比賽中 attachWeapon。
   stages:
     - define: 4 階 medkit type 名稱、回血量、顏色
     - implement: GameConfig.LOOT 加 4 階 entry

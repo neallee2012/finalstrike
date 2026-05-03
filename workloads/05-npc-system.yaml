@@ -12,23 +12,34 @@ sprint_8_changes:
     Armored: { hp_current: 150, hp_target: 300, dmg_current: 15, dmg_target: 28, speed: 8,  note: "×2，強化定位" }
     Elite:   { hp_current: 250, hp_target: 500, dmg_current: 25, dmg_target: 40, speed: 14, note: "×2，繼續是高風險高獎勵" }
   alt_proposal: "提案值 100/220/350 HP（+66%/+47%/+40%）相對 ×2 較弱，建議拍板採 ×2 — 待 CEO 確認"
+
+  # main 改動：NPC 已會持槍（commit 253863f），不再空手攻擊
+  npc_weapon_compat: |
+    main 上 NPC 已加 NPCWeaponEffectsClient + 'turn to face player before firing'。
+    Sprint 8b 不動 NPC 武器系統，只調整 NPC HP/Damage 數值。
+    NPC 用什麼武器 / 火力視覺由 main 上 6236cc1 commit 已實作。
   loot_table_updates:
+    # ⚠️ Reconciliation 2026-05-03: main 已移除 Weapon drop（武器只能商店買）。
+    # NPC LootTable 只保留 Ammo / Coin / Medkit。Sprint 8b 把 Medkit 拆成 4 階。
+    # main 現況（基準）:
+    #   Patrol:  { Ammo=0.7, Coin=0.3 }
+    #   Armored: { Ammo=0.5, Coin=0.3, Medkit=0.2 }
+    #   Elite:   { Ammo=0.3, Coin=0.4, Medkit=0.3 }
     Patrol:
       Ammo: 0.50
-      MedkitSmall: 0.25
+      MedkitSmall: 0.25   # 新（Heal 50）
       Coin: 0.20
-      Weapon: 0.10
     Armored:
       Ammo: 0.50
-      Medkit: 0.35
+      Medkit: 0.35        # 標準（Heal 100）
       Coin: 0.35
-      Weapon: 0.20
     Elite:
-      Ammo: 0.70
-      MedkitLarge: 0.50
-      MedkitFull: 0.05  # 待 Q3 拍板，是否在 Elite drop
-      Coin: 0.60
-      Weapon: 0.45
+      Ammo: 0.40
+      MedkitLarge: 0.50   # 新（Heal 150）
+      MedkitFull: 0.05    # 新（Heal 200，極稀有，待 CEO 拍板）
+      Coin: 0.50
+    weapon_drop_removed: true
+    weapon_drop_reason: "main commit 5928547 改成 shop-only 經濟，weapon drop 已從 GameConfig.LOOT 移除"
   stages:
     - define: 3 種 NPC 新 HP / Damage
     - implement: GameConfig.ENEMIES 更新 HP / Damage / LootTable
