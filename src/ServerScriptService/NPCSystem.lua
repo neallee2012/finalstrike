@@ -385,7 +385,22 @@ local function runNPCAI(npcModel)
 			if closestDist <= attackRange then
 				-- Attack
 				npcModel:SetAttribute("State", "Attack")
-				humanoid:MoveTo(root.Position)  -- stop
+				humanoid:MoveTo(root.Position)  -- stop walking
+
+				-- Face the player before firing (#22) — only Y-axis rotation so
+				-- the NPC stays upright. Done every attack-frame, not just on
+				-- shot, so the body smoothly tracks a moving target instead of
+				-- staring blankly while the muzzle flashes off-axis.
+				local targetCharPos = closestPlayer.Character
+					and closestPlayer.Character:FindFirstChild("HumanoidRootPart")
+					and closestPlayer.Character.HumanoidRootPart.Position
+				if targetCharPos then
+					local lookAt = Vector3.new(targetCharPos.X, root.Position.Y, targetCharPos.Z)
+					-- Skip if target is right on top of us (CFrame.lookAt would error)
+					if (lookAt - root.Position).Magnitude > 0.1 then
+						root.CFrame = CFrame.lookAt(root.Position, lookAt)
+					end
+				end
 
 				if tick() - lastAttack >= npcModel:GetAttribute("AttackRate") then
 					lastAttack = tick()
