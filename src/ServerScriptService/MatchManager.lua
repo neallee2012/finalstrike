@@ -52,6 +52,13 @@ end
 function MatchManager.setPhase(phase)
 	MatchManager.CurrentPhase = phase
 	PhaseChanged:FireAllClients(phase)
+	-- Phases without an active countdown should clear the timer label (#6).
+	-- PvE / PvPWarning push their own per-second TimerUpdate, the others don't.
+	if phase == GameConfig.PHASE.PVP
+		or phase == GameConfig.PHASE.MATCH_END
+		or phase == GameConfig.PHASE.LOBBY then
+		TimerUpdate:FireAllClients(0)
+	end
 	print("[MatchManager] Phase:", phase)
 end
 

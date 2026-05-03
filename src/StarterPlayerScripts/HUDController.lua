@@ -297,9 +297,15 @@ events:WaitForChild("PhaseChanged").OnClientEvent:Connect(function(phase)
 end)
 
 events:WaitForChild("TimerUpdate").OnClientEvent:Connect(function(seconds)
-	local min = math.floor(seconds / 60)
-	local sec = seconds % 60
-	timerLabel.Text = string.format("%d:%02d", min, sec)
+	-- Server sends 0 to mean "no active countdown" (e.g. PvP phase has no time
+	-- limit) — clear the label instead of showing 0:00 (#6).
+	if seconds <= 0 then
+		timerLabel.Text = ""
+	else
+		local min = math.floor(seconds / 60)
+		local sec = seconds % 60
+		timerLabel.Text = string.format("%d:%02d", min, sec)
+	end
 end)
 
 events:WaitForChild("Announcement").OnClientEvent:Connect(function(msg)

@@ -94,18 +94,21 @@ local function fireWeapon()
 	-- Two-stage aim (fixes #8): the muzzle is offset from the camera (right
 	-- hand vs head/eye position), so firing FROM muzzle along the camera's ray
 	-- direction puts shots noticeably off the crosshair. Instead:
-	--   1. Cast from the camera along the screen-pointer ray to find what the
-	--      crosshair is actually over (or a far point if it hits nothing).
-	--   2. Aim from the muzzle TOWARD that point — bullets now follow the
-	--      crosshair regardless of muzzle offset.
-	local screenRay = camera:ScreenPointToRay(mouse.X, mouse.Y)
+	--   1. Cast from the camera along its forward vector to find what the
+	--      crosshair is over (camera.CFrame.LookVector is always exactly the
+	--      crosshair direction — more reliable than mouse.X/Y which can be
+	--      off-by-GuiInset in first-person LockCenter mode).
+	--   2. Aim from the muzzle TOWARD that point — bullets follow the crosshair
+	--      regardless of muzzle offset.
+	local cameraOrigin = camera.CFrame.Position
+	local cameraDir = camera.CFrame.LookVector
 	local aimParams = RaycastParams.new()
 	aimParams.FilterType = Enum.RaycastFilterType.Exclude
 	aimParams.FilterDescendantsInstances = { character }
 	local maxRange = config.Range or 500
-	local aimResult = workspace:Raycast(screenRay.Origin, screenRay.Direction * maxRange, aimParams)
+	local aimResult = workspace:Raycast(cameraOrigin, cameraDir * maxRange, aimParams)
 	local targetPos = aimResult and aimResult.Position
-		or (screenRay.Origin + screenRay.Direction * maxRange)
+		or (cameraOrigin + cameraDir * maxRange)
 	local direction = (targetPos - origin).Unit
 
 	-- Local muzzle flash for the local player (server's WeaponHit handles the
