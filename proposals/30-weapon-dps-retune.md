@@ -56,7 +56,8 @@ CEO 決議 (b)：**重新校 30 武器的 DPS 公式，讓 Common→Demon 的 TT
 | Pistol Common | 75 | 2.40s（Viper Mk1）/ 2.56s（SD） | Common 起跳 |
 | SMG Uncommon | 110 × 1.15 | 1.52–1.54s | Common 無，Uncommon 起跳 |
 | Rifle Uncommon | 110 × 1.15 | 1.50s | Common 無，Uncommon 起跳 |
-| Shotgun Common 近距 | 99 | 0.85–0.90s（理想 2-shot 全中） | Common 起跳 |
+| Shotgun Common/Rare 近距 | 99 / 99×1.30 | **1.70–1.80s（3-shot）** Common；1.50–1.60s（3-shot）Rare | 全中總傷害 84–99 < 100，2 發打不死 200 HP；高階稀有度才 2-shot |
+| Shotgun Epic+ 近距 | 99×1.50+ | **0.65–0.70s（2-shot）** | 全中總傷害 ≥ 104，2 發即死 |
 | Sniper Uncommon body | 110 × 1.15 | **0.95s**（2-shot body）/ 0s（爆頭 1-shot） | Common 無；單發重擊 + 一發冷卻使 TTK 結構性偏短 |
 | Knife Common | 80 | 2.00s | Common 起跳 |
 | Minigun Legendary | 110 × 1.70 + SpinUp | 0.55s sustained + 0.5s SpinUp = **1.05s** | Hailstorm 唯一 |
@@ -78,8 +79,8 @@ CEO 決議 (b)：**重新校 30 武器的 DPS 公式，讓 Common→Demon 的 TT
 | 1 | Viper Mk1 | Pistol | 0.40 | — | 25 | **30** | +20% | 7 發 / **2.40s** |
 | 2 | Viper SD | Pistol | 0.32 | — | 22 | **24** | +9% | 9 發 / **2.56s** |
 | 3 | Fang Scout | Knife | 0.50 (AttackRate) | — | 40 | **40** | 0% | 5 揮 / **2.00s** |
-| 4 | Thunder Stub | Shotgun | 0.85 | 6 | 12 | **14** | +17% | 全中 84/shot → 3 shots / **1.70s**（理想近距 2 shots / **0.85s**）|
-| 5 | Thunder Cut | Shotgun | 0.90 | 8 | 11 | **11** | 0% | 全中 88/shot → 3 shots / **1.80s**（理想近距 2 shots / **0.90s**）|
+| 4 | Thunder Stub | Shotgun | 0.85 | 6 | 12 | **14** | +17% | 全中 84/shot < 100 → **3 shots 必要 / 1.70s** |
+| 5 | Thunder Cut | Shotgun | 0.90 | 8 | 11 | **11** | 0% | 全中 88/shot < 100 → **3 shots 必要 / 1.80s** |
 
 ### 2.2 Uncommon (5) — 倍率 1.15
 
@@ -97,9 +98,9 @@ CEO 決議 (b)：**重新校 30 武器的 DPS 公式，讓 Common→Demon 的 TT
 |---|---|---|---|---|---|---|---|---|
 | 11 | Reaver-X | Rifle | 0.14 | — | 42 | **20** | -52% | 10 發 / **1.26s** |
 | 12 | Phantom Night | Rifle | 0.12 | — | 38 | **17** | -55% | 12 發 / **1.32s** |
-| 13 | Thunder Guard | Shotgun | 0.75 | 8 | 14 | **12** | -14% | 全中 96/shot → 3 shots / **1.50s**（理想近距 2 shots / **0.75s**）|
+| 13 | Thunder Guard | Shotgun | 0.75 | 8 | 14 | **12** | -14% | 全中 96/shot < 100 → **3 shots 必要 / 1.50s** |
 | 14 | Wraith Hunter | Sniper | 1.20 | — | 110 | **172** | +56% | 2 發 body / **1.20s** · **爆頭 344 一發秒殺 / 0s** |
-| 15 | Thunder Triple | Shotgun | 0.80 | 9 | 15 | **11** | -27% | 全中 99/shot → 3 shots / **1.60s**（理想近距 2 shots / **0.80s**）|
+| 15 | Thunder Triple | Shotgun | 0.80 | 9 | 15 | **11** | -27% | 全中 99/shot < 100 → **3 shots 必要 / 1.60s** |
 
 ### 2.4 Epic (6) — 倍率 1.50
 
