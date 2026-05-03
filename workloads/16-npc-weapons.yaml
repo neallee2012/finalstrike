@@ -1,0 +1,87 @@
+name: NPCWeapons
+owner: claude-code
+priority: P2-polish
+status: ✅ DONE (Sprint 8 — commits 253863f, 6236dc1，Sprint 8a 補檔)
+backfill_receipt: receipts/sprint-8-shop-economy-fps.md
+backfill_note: |
+  此 contract 為 Sprint 8a 衛生補課產出。實際實作分散在：
+  - 253863f feat(combat): HP reset on death + 5-min PvP timer + NPC weapons & fire visuals
+  - 6236dc1 fix(npc): turn to face player before firing instead of side-shooting
+  延伸 Sprint 7 的「武器要看到外型」需求 — 不只玩家，NPC 也要看起來在開槍。
+
+# ============= 系統定位 =============
+purpose: |
+  NPC 持槍 + 開火視覺反饋：
+  1. NPC spawn 時依 EnemyType attach 對應武器（Tool 系統，跟玩家共用 WeaponMeshes）
+  2. NPC 攻擊前轉向面對玩家（避免側面開槍 bug，#19）
+  3. NPC 開火時 server fire NPCFireWeapon RemoteEvent 給所有 client，
+     client 端 spawn local muzzle flash + tracer（不 replicate Parts，效能）
+
+# ============= 規格 =============
+npc_weapon_assignment:
+  source: NPCSystem.lua line 18-22 (NPC_WEAPON table)
+  rule: "依 EnemyType 對應一把固定武器"
+  exact_mapping:
+    Patrol:  "Viper Mk1"        # Common Pistol
+    Armored: "Stinger Mk2"      # Uncommon SMG
+    Elite:   "Phantom Ranger"   # Uncommon Rifle
+  rationale: |
+    所有 NPC 用 Common/Uncommon 武器，故意「不給 NPC 高稀有度武器」—
+    避免 Elite NPC 用 Demon Wraith Abyss 一發秒殺玩家。
+    NPC 強度差異化靠 HP / Damage / AI 速度，不靠武器稀有度。
+  attach_method: |
+    Tool 直接 parent 到 NPC character — Roblox 內建 tool-hold animation
+    自動套用，跟玩家路徑一致。
+
+face_player_before_fire:
+  problem: |
+    AI 改用 PathfindingService 後，攻擊範圍內 humanoid:MoveTo(root.Position) 停下，
+    但 character orientation 維持上一個 waypoint 方向 → 從側面開槍視覺很怪 (#19)。
+  fix: |
+    AI 攻擊前計算 Vector3 from npc.HumanoidRootPart to player.HumanoidRootPart，
+    set HumanoidRootPart.CFrame = CFrame.lookAt(currentPos, playerPos.WithSameY)。
+  side_effects: "可能與 PathfindingService 的 movement 有微衝突；用 BodyGyro 或 CFrame 直接旋轉皆可，commit 用後者"
+
+fire_visual:
+  client_side_only: true
+  rationale: "Performance — 12 NPCs 同時開槍會生 24 個 Part replicate，浪費頻寬"
+  remote_event: NPCFireWeapon
+  server_payload: "(npcModel, muzzlePos, targetPos)"
+  client_implementation:
+    - "spawnMuzzleFlash(muzzlePos): 0.5×0.5 neon ball + PointLight，0.08s tween 消失"
+    - "spawnTracer(muzzlePos, targetPos): 細圓柱 neon beam，0.12s tween 消失"
+    - "Debris:AddItem 0.15-0.2s 確保清乾淨"
+  fx_color: "Color3.fromRGB(255, 220, 130) — 暖黃，跟玩家 muzzle flash 視覺統一"
+
+artifacts:
+  - src/ServerScriptService/NPCSystem.lua  (NPC AI + face_player + fire trigger)
+  - src/StarterPlayerScripts/NPCWeaponEffectsClient.lua  (62 行 — client FX)
+  - src/ServerStorage/WeaponMeshes.lua  (NPC 用同一個 builder，不需修改)
+  - src/ServerScriptService/GameEventsBootstrap.lua  (NPCFireWeapon RemoteEvent)
+  - src/ServerScriptService/MatchManager.lua  (server NPC fire 觸發點)
+
+success_criteria:
+  - "9 NPC（4 Patrol/3 Armored/2 Elite）spawn 後手持武器可見"
+  - "NPC 攻擊前轉向面對玩家，不再從側面開槍"
+  - "NPC 開火時 client 看到 muzzle flash + tracer"
+  - "12 NPC 同時開火 不導致 client FPS 掉（FX 純 client，Debris 自動清）"
+  - "NPC 死亡時武器 Tool 跟著 character 一起 destroy，不殘留"
+
+recovery:
+  - "NPC 沒武器 → createR15NPC 是否在 model.Parent = workspace 之後 attach Tool"
+  - "NPC 側面開槍 → face_player CFrame 修正點是否在 attack 邏輯內、是否每次 attack 重算"
+  - "FX 不出現 → NPCFireWeapon RemoteEvent 是否 fire from server，client subscribe 是否註冊"
+  - "FX 殘留場景 → Debris:AddItem 是否 set 對 lifetime"
+
+# ============= Sprint 8b 影響 =============
+sprint_8b_compat: |
+  Sprint 8b 改 NPC HP/Damage ×2，本系統不受影響（FX 與武器 mesh 跟 damage 數值無關）。
+  workloads/05-npc-system.yaml 已在 Sprint 8b 計劃中註明 NPC weapon system 不動。
+
+# ============= 依賴 =============
+dependencies:
+  upstream:
+    - WeaponMeshes (build NPC weapon Tool)
+    - GameConfig.WEAPONS (NPC 武器抽選池)
+    - NPCSystem (spawn + AI 整合)
+  downstream: []
