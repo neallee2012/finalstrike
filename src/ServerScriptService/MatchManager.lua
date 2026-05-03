@@ -16,6 +16,12 @@ local Announcement = events:WaitForChild("Announcement")
 local PlayerEliminated = events:WaitForChild("PlayerEliminated")
 local KillFeed = events:WaitForChild("KillFeed")
 
+-- Per-shot [Fire] debug logging. Auto weapons fire ~12 shots/sec and shotguns
+-- log per pellet, so this is OFF by default to avoid flooding the console
+-- during normal play. Flip to true on the running server (or here) when
+-- debugging aim drift / hit registration. Reviewer-requested gate (#13).
+local DEBUG_FIRE_LOG = false
+
 local MatchManager = {}
 MatchManager.CurrentPhase = GameConfig.PHASE.LOBBY
 MatchManager.AlivePlayers = {}
@@ -52,6 +58,13 @@ end
 function MatchManager.setPhase(phase)
 	MatchManager.CurrentPhase = phase
 	PhaseChanged:FireAllClients(phase)
+	-- Phases without an active countdown should clear the timer label (#6).
+	-- PvE / PvPWarning push their own per-second TimerUpdate, the others don't.
+	if phase == GameConfig.PHASE.PVP
+		or phase == GameConfig.PHASE.MATCH_END
+		or phase == GameConfig.PHASE.LOBBY then
+		TimerUpdate:FireAllClients(0)
+	end
 	print("[MatchManager] Phase:", phase)
 end
 
@@ -472,6 +485,13 @@ events:WaitForChild("FireWeapon").OnServerEvent:Connect(function(player, origin,
 		local dir = (direction.Unit + spread).Unit * config.Range
 
 		local result = workspace:Raycast(origin, dir, rayParams)
+		-- Per-shot debug log (#13) — gated behind DEBUG_FIRE_LOG so auto-weapons
+		-- and shotguns don't flood the console during normal combat.
+		if DEBUG_FIRE_LOG then
+			print(string.format("[Fire] %s %s hit=%s",
+				player.Name, weaponName,
+				result and (result.Instance:GetFullName() .. " @ " .. tostring(result.Position)) or "MISS"))
+		end
 		if result then
 			local hitPart = result.Instance
 			local hitChar = hitPart.Parent

@@ -195,6 +195,18 @@ local TYPE_TO_BUILDER = {
 	Minigun = builders.Stinger,  -- placeholder
 }
 
+-- Local position of the LeftGrip attachment (relative to Handle) per weapon Type.
+-- ViewmodelController uses this to drive an IKControl that pins LeftHand to the
+-- weapon — making both hands visually grip two-handed weapons in first-person.
+-- Nil entries (Pistol, Knife) mean "single-handed, no IK".
+local LEFT_GRIP_OFFSET = {
+	SMG     = Vector3.new(0, 0.5, -1.0),   -- ~Mag area
+	Rifle   = Vector3.new(0, 0.18, -1.4),  -- on the Foregrip
+	Shotgun = Vector3.new(0, 0.32, -1.0),  -- on the Pump
+	Sniper  = Vector3.new(0, 0.5, -2.0),   -- mid-barrel
+	Minigun = Vector3.new(0, 0.5, -1.0),
+}
+
 -- Public: build(weaponName) -> Tool (Handle is the BasePart, Muzzle is an
 -- Attachment on the Handle). Wrapping as a Tool lets Roblox's built-in grip
 -- system handle the hand pose; we set Tool.Grip so the player's hand sits at
@@ -209,6 +221,16 @@ function WeaponMeshes.build(weaponName)
 		return nil
 	end
 	local model, handle = fn()
+
+	-- Add LeftGrip attachment for two-handed weapons so client IKControl can
+	-- snap the player's LeftHand to it (visual: both hands gripping the gun).
+	local leftGripOffset = LEFT_GRIP_OFFSET[cfg.Type]
+	if leftGripOffset then
+		local leftGrip = Instance.new("Attachment")
+		leftGrip.Name = "LeftGrip"
+		leftGrip.Position = leftGripOffset
+		leftGrip.Parent = handle
+	end
 
 	-- Convert Model wrapper to a Tool. Tool wants Handle as a direct child
 	-- named "Handle". Move all the model's children up into the Tool.

@@ -11,6 +11,9 @@ local player = Players.LocalPlayer
 local events = ReplicatedStorage:WaitForChild("GameEvents")
 
 -- ====== CREATE HUD ======
+-- Main HUD ScreenGui keeps the default IgnoreGuiInset=false so existing widgets
+-- (HP bar at bottom, alive count + currency at top, kill feed, announcement, etc.)
+-- stay in their authored positions relative to the inset-aware coordinate space.
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "FinalStrikeHUD"
 screenGui.ResetOnSpawn = false
@@ -250,20 +253,53 @@ local function showWinner(text)
 end
 
 -- === CROSSHAIR ===
-local crosshair = Instance.new("Frame")
-crosshair.Name = "Crosshair"
-crosshair.Size = UDim2.new(0, 2, 0, 20)
-crosshair.Position = UDim2.new(0.5, -1, 0.5, -10)
-crosshair.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-crosshair.BorderSizePixel = 0
-crosshair.Parent = screenGui
+-- Lives in its own ScreenGui with IgnoreGuiInset=true so the crosshair at
+-- UDim2(0.5, _, 0.5, _) lines up with camera.CFrame.LookVector (real viewport
+-- center). Without this, the crosshair sits ~18px below true center because of
+-- the top-bar inset, and shots aim slightly above what the player thinks they
+-- are targeting (#13). Kept in a separate ScreenGui so the inset adjustment
+-- doesn't affect the rest of the HUD layout (which is authored against the
+-- inset-aware coordinate space).
+local crosshairGui = Instance.new("ScreenGui")
+crosshairGui.Name = "FinalStrikeCrosshair"
+crosshairGui.ResetOnSpawn = false
+crosshairGui.IgnoreGuiInset = true
+crosshairGui.Parent = player.PlayerGui
 
-local crosshairH = Instance.new("Frame")
-crosshairH.Size = UDim2.new(0, 20, 0, 2)
-crosshairH.Position = UDim2.new(0.5, -10, 0.5, -1)
-crosshairH.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-crosshairH.BorderSizePixel = 0
-crosshairH.Parent = screenGui
+-- CEO-spec 4-segment open-center reticle: top/bottom/left/right white lines
+-- with a center gap. Black UIStroke outline keeps the reticle visible against
+-- bright backgrounds (sky, neon lights). Matches the reference image — gap
+-- around center, subtle black border.
+local LINE_LENGTH = 14    -- length of each arm
+local LINE_THICKNESS = 2
+local CENTER_GAP = 6      -- pixels from screen center to inner end of each arm
+
+local function makeReticleLine(name, size, position)
+	local line = Instance.new("Frame")
+	line.Name = name
+	line.Size = size
+	line.Position = position
+	line.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	line.BorderSizePixel = 0
+	line.Parent = crosshairGui
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(0, 0, 0)
+	stroke.Thickness = 1
+	stroke.Parent = line
+end
+
+makeReticleLine("ReticleTop",
+	UDim2.new(0, LINE_THICKNESS, 0, LINE_LENGTH),
+	UDim2.new(0.5, -math.floor(LINE_THICKNESS/2), 0.5, -CENTER_GAP - LINE_LENGTH))
+makeReticleLine("ReticleBottom",
+	UDim2.new(0, LINE_THICKNESS, 0, LINE_LENGTH),
+	UDim2.new(0.5, -math.floor(LINE_THICKNESS/2), 0.5, CENTER_GAP))
+makeReticleLine("ReticleLeft",
+	UDim2.new(0, LINE_LENGTH, 0, LINE_THICKNESS),
+	UDim2.new(0.5, -CENTER_GAP - LINE_LENGTH, 0.5, -math.floor(LINE_THICKNESS/2)))
+makeReticleLine("ReticleRight",
+	UDim2.new(0, LINE_LENGTH, 0, LINE_THICKNESS),
+	UDim2.new(0.5, CENTER_GAP, 0.5, -math.floor(LINE_THICKNESS/2)))
 
 -- ====== EVENT HANDLERS ======
 events:WaitForChild("HealthUpdate").OnClientEvent:Connect(function(hp, maxHP)
@@ -297,9 +333,15 @@ events:WaitForChild("PhaseChanged").OnClientEvent:Connect(function(phase)
 end)
 
 events:WaitForChild("TimerUpdate").OnClientEvent:Connect(function(seconds)
-	local min = math.floor(seconds / 60)
-	local sec = seconds % 60
-	timerLabel.Text = string.format("%d:%02d", min, sec)
+	-- Server sends 0 to mean "no active countdown" (e.g. PvP phase has no time
+	-- limit) — clear the label instead of showing 0:00 (#6).
+	if seconds <= 0 then
+		timerLabel.Text = ""
+	else
+		local min = math.floor(seconds / 60)
+		local sec = seconds % 60
+		timerLabel.Text = string.format("%d:%02d", min, sec)
+	end
 end)
 
 events:WaitForChild("Announcement").OnClientEvent:Connect(function(msg)
