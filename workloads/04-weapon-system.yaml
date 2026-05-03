@@ -1,23 +1,108 @@
 name: WeaponSystem
 owner: claude-code
 priority: P0-prototype
-status: ✅ DONE (Sprint 3)
+status: ✅ DONE (Sprint 3 + Sprint 7 visual) | 🔄 REBALANCE PLANNED (Sprint 8)
+
+# ============= Sprint 8 計劃中的修改 =============
+# 詳見 proposals/sprint-8-200hp-balance.md §4.2 + §3.5
+sprint_8_changes:
+  goal: "玩家 200 HP 後，6 把武器 TTK 重新調整，維持各武器定位 + Wraith headshot 機制"
+  damage_table:
+    Viper:   { current: 25, target: 35,  ttk_vs_200hp: "2.4s (6 shots)",   role: "半自動手槍 / 起手武器" }
+    Stinger: { current: 15, target: 20,  ttk_vs_200hp: "0.86s (10 shots)", role: "全自動 SMG / 近戰壓制",
+               note: "微偏離提案 18 → 20，避免 SMG TTK 落後 Phantom 太多 — 待 CEO 確認" }
+    Phantom: { current: 30, target: 45,  ttk_vs_200hp: "0.75s (5 shots)",  role: "全自動步槍 / 主力" }
+    Thunder: { current: 12, target: 13,  ttk_vs_200hp: "近距 1 發 / 中距 2-3 發",
+               role: "霰彈 10 pellets（從 8 提高）",
+               pellets_change: "8 → 10",
+               total_damage: { close: 130, mid: "60-90", far: "20-40" },
+               mechanism: "spread 自然散落，不新增距離 falloff",
+               status: "✅ Q2 RESOLVED 2026-05-03" }
+    Wraith:  { current: 90, target_body: 150, target_headshot: 200,
+               ttk_vs_200hp: "身體 2 發 (1.5s) / 爆頭 1 發",
+               role: "狙擊 / 精準爆頭秒殺",
+               mechanism: "新增 headshot 偵測（hitPart.Name == 'Head'）",
+               status: "✅ Q1 RESOLVED 2026-05-03" }
+    Fang:    { current: 40, target: 60,  ttk_vs_200hp: "2.0s (4 hits)",    role: "近戰 / 高風險高傷害" }
+  fire_rate: "不動，全部維持現值"
+  mag_size: "不動"
+  reload_time: "不動"
+  spread: "Thunder 維持 0.1（不動），playtest 後若中遠距落點偏離期望再 tune"
+
+  # Sprint 8 新工程：Wraith Headshot 偵測
+  headshot_system:
+    scope: "ONLY Wraith — 不擴展全武器"
+    rationale: |
+      全武器爆頭 1.5x/2x 是 FPS 標準但會打亂 TTK 表
+      （Phantom 5 發殺變 3 發），影響面太大。
+      CEO 訊息只描述 Wraith 爆頭。Sprint 9+ 評估擴展。
+    detection: |
+      MatchManager.lua FireWeapon handler 內 raycast result 後：
+      local isHeadshot = result.Instance.Name == "Head"
+      if weaponName == "Wraith" and isHeadshot then
+          damage = config.HeadshotDamage  -- 200
+      else
+          damage = config.Damage  -- 150
+      end
+    config_addition: |
+      GameConfig.WEAPONS.Wraith.HeadshotDamage = 200
+    npc_compat: |
+      R15 NPC 也有 Head part，命名一致 → 玩家 vs NPC 也適用
+      但 NPC 戴的 hat/hood/helmet accessory 命中時不算 headshot
+      （hitPart.Name 不是 "Head"）— 嚴格 Head part only
+    edge_cases:
+      - "Patrol 警衛帽（cap accessory）擋下 → 算非爆頭，傷害 150 → Patrol 120 HP 一發殺"
+      - "Armored 戰術頭盔（helmet accessory）擋下 → 算非爆頭，傷害 150 → 仍要 2 發"
+      - "Elite 兜帽（hood accessory）擋下 → 算非爆頭"
+    visual_polish_optional: "killfeed 顯示 'HEADSHOT' 標記 — Sprint 9 candidate"
+
+  stages:
+    - define: 6 把武器新傷害值 + Wraith headshot 機制
+    - implement: GameConfig.WEAPONS 改 Damage + 新增 Wraith.HeadshotDamage
+    - implement: GameConfig.WEAPONS.Thunder Pellets 8 → 10
+    - implement: MatchManager FireWeapon handler 加 hitPart.Name=="Head" 分支（Wraith only）
+    - verify: Wraith body shot vs Patrol（120 HP）→ 1 發殺（150 > 120）
+    - verify: Wraith head shot vs Armored（300 HP）→ 200 dmg（剩 100），第二發再殺
+    - verify: Wraith body shot vs 玩家（200 HP）→ 剩 50 HP（仍存活）
+    - verify: Wraith head shot vs 玩家（200 HP）→ 0 HP（一發秒殺）
+    - verify: 其他 5 把武器命中 Head part = 一般傷害（不加成）
+    - verify: Thunder 近距全中總傷害 130 ±10、遠距散落 20-40
+    - verify: 在 Studio playtest 各武器空槍對 NPC 計算實際 TTK 落在容差內
+
+  new_success_criteria:
+    - 6 把武器 TTK 落在表格 ±0.2s（fire rate 不變所以可預測）
+    - Wraith 身體 150 / 爆頭 200，server 端正確分流
+    - 其他武器爆頭傷害 = 一般傷害（無加成 — 嚴格 scope control）
+    - Thunder 10 pellets × 13 dmg，近距全中 130
+    - Stinger 換彈次數從 0.5 換 / 殺 → 0.33 換 / 殺，有壓制感
+
+  decision_pending:
+    - "Stinger 採 20 dmg 還是嚴格照提案 18"
+    - "Thunder spread 是否需要從 0.1 調整以達到中遠距期望範圍（playtest 後決定）"
+
+# ============= 已完成的歷史 =============
 stages:
   - define: 6 把虛構武器數據 (GameConfig)
   - implement: 射擊 Raycast + 傷害計算
   - implement: 彈藥消耗 + 換彈
   - implement: 客戶端輸入 + 自動射擊
+  - implement: 武器 Tool + 第三人稱可見 mesh (Sprint 7)
+  - implement: muzzle flash + raycast origin 從 Muzzle.WorldPosition (Sprint 7)
   - verify: 每把武器射擊 + 傷害 + 換彈正常
 success_criteria:
   - 6 把武器可裝備可射擊
-  - Viper 25, Stinger 15, Phantom 30, Thunder 12×8, Wraith 90, Fang 40
+  - Viper 25, Stinger 15, Phantom 30, Thunder 12×8, Wraith 90, Fang 40 (Sprint 8 重新平衡)
   - 全自動/半自動模式正確
   - 彈藥耗盡需換彈
+  - 玩家右手握槍可見、muzzle flash 從槍口出 (Sprint 7)
 artifacts:
   - src/ReplicatedStorage/GameConfig.lua (weapon data)
   - src/ServerScriptService/MatchManager.lua (fire handler)
   - src/StarterPlayerScripts/WeaponClient.lua
   - src/ServerStorage/WeaponSystem.lua
+  - src/ServerStorage/WeaponMeshes.lua (Sprint 7)
 recovery:
   - Raycast 穿牆 → FilterDescendantsInstances 排除自己
   - 傷害不觸發 → 檢查 RemoteEvent 是否在 GameEvents 建立
+  - Tool grip 角度錯 → 用 Tool.Grip 屬性而非 Motor6D，Handle -Z 對齊 hand 前向 (Sprint 7 lesson)
+  - muzzle flash 看不到 → client-only 效果，第三人稱 self 才看得到 (待 Sprint 9 跨玩家可見)

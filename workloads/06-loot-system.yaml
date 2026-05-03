@@ -1,7 +1,40 @@
 name: LootSystem
 owner: claude-code
 priority: P1-polish
-status: ✅ DONE (Sprint 3)
+status: ✅ DONE (Sprint 3) | 🔄 REBALANCE PLANNED (Sprint 8 — 4 階 medkit)
+
+# ============= Sprint 8 計劃中的修改 =============
+# 詳見 proposals/sprint-8-200hp-balance.md §4.4
+sprint_8_changes:
+  goal: "200 HP 玩家需要 4 階補血量，醫療包才有差異化價值"
+  medkit_tiers:
+    MedkitSmall:  { heal: 50,  rarity: "常見",   color: "Color3.fromRGB(120, 255, 150)", source: "Patrol drop + 地圖" }
+    Medkit:       { heal: 100, rarity: "標準",   color: "Color3.fromRGB(50, 255, 100)",  source: "Armored drop + 地圖" }
+    MedkitLarge:  { heal: 150, rarity: "稀有",   color: "Color3.fromRGB(20, 200, 80)",   source: "Elite drop" }
+    MedkitFull:   { heal: 200, rarity: "極稀有", color: "Color3.fromRGB(255, 255, 200)", source: "Elite 5% drop（暫定）" }
+  config_addition:
+    GameConfig.LOOT.MedkitSmall: { Heal: 50 }
+    GameConfig.LOOT.Medkit:      { Heal: 100 }
+    GameConfig.LOOT.MedkitLarge: { Heal: 150 }
+    GameConfig.LOOT.MedkitFull:  { Heal: 200 }
+  stages:
+    - define: 4 階 medkit type 名稱、回血量、顏色
+    - implement: GameConfig.LOOT 加 4 階 entry
+    - implement: createPickup switch case 加 4 階顏色
+    - implement: Touched handler 對應 healPlayer 不同回血量
+    - implement: NPCSystem dropLoot 抽 medkit 時依 NPC type 決定 tier
+    - verify: 4 種 medkit pickup 顏色可辨
+    - verify: 拾取後 HP 增加正確、cap 200
+  new_success_criteria:
+    - 4 階 medkit pickup 視覺可辨（淺綠 → 標準綠 → 深綠 → 米白）
+    - 回血量正確：50/100/150/200
+    - 不會超過 MAX_HP（200 cap）
+    - 拾取仍是觸碰立即生效（不做 channel — Q3 推薦延後）
+  decision_pending:
+    - "Q3 channel 式補血是否 Sprint 8 做（推薦 NO）"
+    - "MedkitFull 是否 Sprint 8 出在 Elite drop（推薦 5% drop）"
+
+# ============= 已完成的歷史 =============
 stages:
   - define: 4 種拾取物 (Ammo/Medkit/Coin/Weapon)
   - implement: 地圖固定生成點 + NPC 掉落
@@ -12,9 +45,11 @@ success_criteria:
   - 拾取物有 Neon 材質 + PointLight
   - 浮動旋轉動畫
   - 60 秒自動消失
-  - 醫療包 heal 50, cap 100
+  - 醫療包 heal 50, cap 100（Sprint 8 將改 4 階 + cap 200）
 artifacts:
   - src/ServerScriptService/LootSystem.lua
+  - src/ServerScriptService/NPCSystem.lua (dropLoot 部分)
 recovery:
   - Touched 不觸發 → 確認 CanCollide=false
   - 重複拾取 → Destroy 後從 activeLoot 移除
+  - Pickup 飄到地圖外 → bobbing animation 用 startY 鎖定，不要用增量

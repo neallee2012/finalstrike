@@ -1,0 +1,58 @@
+name: ArmorSystem
+owner: claude-code
+priority: P1-polish
+status: 📋 PROPOSED (Sprint 9 — pending CEO Q4 approval)
+proposal_doc: proposals/sprint-8-200hp-balance.md
+
+# 護甲片系統 — 從 Sprint 8 提案分離出來，Sprint 9 候選
+# 詳見 proposals/sprint-8-200hp-balance.md §3 Q4 + §5
+
+design:
+  goal: "玩家在 200 HP 之外能臨時多扛 50 點傷害，戰術選項"
+  rules:
+    max_armor: 50
+    pickup_grants: 50  # 一次補滿，不能堆疊到 100
+    damage_order: "先扣 Armor，扣完才扣 HP（先全部吸收，無 split）"
+    no_armor_regen: true  # 護甲不會自動回，只能撿護甲片
+    persists_through_match: true  # 不重置直到淘汰
+  alt_design_questions:
+    - "傷害是否 split（armor 半 + HP 半）還是 fully absorb？— 推薦 fully absorb，玩家更有感"
+    - "armor 撿到時 HP 條上方顯示，淘汰後消失？— yes"
+
+stages:
+  - define: GameConfig.ARMOR + LOOT.ArmorPlate config
+  - implement: playerData.Armor field
+  - implement: MatchManager.damagePlayer 護甲吸收公式
+  - implement: ArmorUpdate RemoteEvent + broadcast on change
+  - implement: HUDController 護甲條 overlay
+  - implement: ArmorPlate pickup type in LootSystem.createPickup
+  - implement: NPCSystem dropLoot 加 ArmorPlate（Armored 25%、Elite 35%）
+  - verify: 撿到 → Armor=50、HP 條上方顯示銀色細條
+  - verify: 受 30 傷害（Armor 50/HP 200）→ Armor=20, HP=200
+  - verify: 受 60 傷害（Armor 20/HP 200）→ Armor=0, HP=180（吸收 20 後溢出 40 → HP）
+  - verify: 已有 Armor=50 再撿護甲片 → 保持 50（不能超）
+  - verify: 淘汰後 Armor 重置 0
+
+success_criteria:
+  - 撿護甲片 → Armor 50（已滿時不可拾取或拾取無效）
+  - 傷害 → 先扣 Armor 後扣 HP（spillover 算對）
+  - HUD 銀色細條在 HP 條上方
+  - NPC drop chance 對應 design 表
+  - 重置匹配時 playerData.Armor 歸零
+
+artifacts_planned:
+  - src/ReplicatedStorage/GameConfig.lua (新增 ARMOR config + LOOT.ArmorPlate)
+  - src/ServerScriptService/MatchManager.lua (damagePlayer 公式 + initPlayerData Armor=0 + ArmorUpdate)
+  - src/ServerScriptService/LootSystem.lua (createPickup ArmorPlate case)
+  - src/ServerScriptService/NPCSystem.lua (dropLoot ArmorPlate roll)
+  - src/StarterPlayerScripts/HUDController.lua (護甲條 overlay + ArmorUpdate listener)
+
+recovery:
+  - 傷害公式錯誤 → 用 unit test：護甲 30 / HP 100、傷害 50 → 應 護甲 0 / HP 80
+  - HUD overlay 蓋住 HP 條 → ZIndex 排序 + 透明度
+  - ArmorPlate pickup 沒重置 → 確認 resetToLobby 重置 playerData
+
+decision_pending:
+  - "Q4 護甲片是否 Sprint 9 做（推薦 yes）"
+  - "傷害公式：fully absorb vs split — 推薦 fully absorb"
+  - "Sprint 9 vs Sprint 10 排程"

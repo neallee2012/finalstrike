@@ -1,7 +1,31 @@
 name: PlayerHealth
 owner: claude-code
 priority: P0-prototype
-status: ✅ DONE (Sprint 2)
+status: ✅ DONE (Sprint 2) | 🔄 REBALANCE PLANNED (Sprint 8 — 200 HP)
+
+# ============= Sprint 8 計劃中的修改 =============
+# 詳見 proposals/sprint-8-200hp-balance.md
+# 等待 CEO 拍板後執行
+sprint_8_changes:
+  goal: "玩家 100 HP → 200 HP，降低秒殺挫折感，補血道具分階段才有意義"
+  stages:
+    - define: 200 HP 上限 + 4 階補血
+    - implement: GameConfig.MAX_HP 100 → 200
+    - implement: initPlayerData 起始 200 HP
+    - implement: healPlayer 對應不同 medkit type 回血量
+    - implement: HUD 血量條顯示適配 maxHP=200（顏色閾值用比例不需改）
+    - verify: Patrol NPC 站樁攻擊 → 玩家從 200 HP 降到 0 約 ~7s（vs 現在 ~4s）
+    - verify: Phantom 步槍 5 發殺玩家、Viper 6 發、Wraith 2 發
+  new_success_criteria:
+    - 起始 200 HP（而非 100）
+    - 4 階補血量正確：Small=50 / Medium=100 / Large=150 / Full=200
+    - HP 不能超過 200（cap 邏輯不變）
+    - HP 條紅黃綠閾值維持比例計算（>60%=綠, >30%=黃, ≤30%=紅）
+  decision_pending:
+    - "Q1 Wraith 是否接受 2 發殺（150 dmg vs 200 HP）— 推薦 A"
+    - "NPC 數值用提案值還是 ×2 值 — 推薦 ×2"
+
+# ============= 已完成的歷史 =============
 stages:
   - define: 100 HP 系統 + 淘汰機制
   - implement: damagePlayer / healPlayer API
@@ -9,8 +33,8 @@ stages:
   - implement: 被淘汰者不影響比賽中玩家
   - verify: HP 歸零 → 淘汰 → 傳送觀戰區
 success_criteria:
-  - 起始 100 HP
-  - 醫療包回 50 HP，cap 100
+  - 起始 100 HP（Sprint 8 將改 200）
+  - 醫療包回 50 HP，cap 100（Sprint 8 將改 4 階）
   - HP 歸零標記 Eliminated
   - 淘汰後傳送觀戰區
 artifacts:
@@ -18,3 +42,4 @@ artifacts:
   - src/ServerScriptService/MatchManager.lua (health handlers)
 recovery:
   - 淘汰後仍可傷害他人 → 檢查 Eliminated flag
+  - HP 顯示異常 → 確認 HealthUpdate event 在 GameEvents 建立
