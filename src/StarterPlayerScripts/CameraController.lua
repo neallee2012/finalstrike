@@ -43,25 +43,45 @@ local function shouldLock()
 	return inArena and not localEliminated and not isAnyInteractiveUIOpen()
 end
 
+-- Transient enforcement window after exiting first-person. The built-in
+-- CameraScript clings to LockCenter for several frames as it transitions out
+-- of LockFirstPerson — without this window, MouseBehavior re-locks itself
+-- and shop / spectate become unusable. After the window expires we stop
+-- enforcing so right-click drag and click-to-move work normally (#14, #15).
+local releaseEnforceUntil = 0
+
 local function applyCameraState()
-	-- CameraMode is the visual trigger; mouse state is enforced per-frame below
-	-- because the built-in CameraScript can re-lock LockCenter when CameraMode
-	-- transitions through LockFirstPerson, ignoring single-shot Default sets.
 	if shouldLock() then
 		player.CameraMode = Enum.CameraMode.LockFirstPerson
 		UserInputService.MouseIconEnabled = false
+		releaseEnforceUntil = 0
 	else
 		player.CameraMode = Enum.CameraMode.Classic
 		UserInputService.MouseIconEnabled = true
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		-- Hold Default for ~1s so CameraScript's transition can't re-lock us
+		releaseEnforceUntil = tick() + 1.0
 	end
 end
 
--- Every frame, force MouseBehavior to match shouldLock(). Cheap (one comparison
--- + occasional assignment) and reliable against CameraScript's overrides.
+-- RenderStepped enforcement, three branches:
+--   1. shouldLock() (in-arena, no UI open): keep LockCenter — CameraScript can
+--      release it during transitions, so we have to clamp it back.
+--   2. interactive UI open (shop/quest): keep Default for as long as the panel
+--      is open, otherwise CameraScript creeps it back to LockCenter and the
+--      player can't click buttons after a few seconds (#14, #15).
+--   3. lobby/spectate (no UI, no lock): only enforce Default during the brief
+--      transition window (releaseEnforceUntil); afterwards release entirely so
+--      Roblox's CameraScript can manage right-click drag and click-to-move.
 RunService.RenderStepped:Connect(function()
-	local target = shouldLock() and Enum.MouseBehavior.LockCenter or Enum.MouseBehavior.Default
-	if UserInputService.MouseBehavior ~= target then
-		UserInputService.MouseBehavior = target
+	if shouldLock() then
+		if UserInputService.MouseBehavior ~= Enum.MouseBehavior.LockCenter then
+			UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+		end
+	elseif isAnyInteractiveUIOpen() or tick() < releaseEnforceUntil then
+		if UserInputService.MouseBehavior ~= Enum.MouseBehavior.Default then
+			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		end
 	end
 end)
 
