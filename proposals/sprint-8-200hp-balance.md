@@ -88,9 +88,10 @@ Status: 🔄 (b) 路線 RESOLVED 2026-05-03（30 武器 DPS 公式收斂）/ Q1/
 - 爆頭 = 「一發秒殺」
 
 **Sprint 8b 實作做法**（見 §3.5）：
-- 改成 **Type-based**：`config.Type == "Sniper"` 套用 `GameConfig.HEADSHOT_MULTIPLIER`（提議 2.0x）
+- 改成 **Type-based**：`config.Type == "Sniper"` 套用 `GameConfig.HEADSHOT_MULTIPLIER`（提議 2.0x，配 D1）
 - 涵蓋 5 把 Wraith 系列，body damage 走 (b) 公式 retune（不寫死 150）
-- 爆頭=身體 ×2.0：Rare 起跳 1 發秒殺 200 HP 玩家，Uncommon Wraith Scout 仍要 2 發
+- **設計決議 D1（採用）：post-(b) body × 2.0x → 全 5 把 Sniper 對 200 HP 玩家爆頭都 1-shot 秒殺**（包含 Wraith Scout 240 dmg）。Sniper 內部稀有度進階靠 body TTK / Range / 特殊機制
+- D2 替代（保留 Wraith Scout 不 1-shot milestone）詳見 §3.5.2，預設不採
 - ~~原 CEO 指示「身體 150 / 爆頭 200」~~ — **撤銷具體數字**，改走 Type-based 機制
 
 ### Q2: Thunder 霰彈槍 90~140 是「總傷害」還是「per-pellet」？ ⛔ WITHDRAWN 2026-05-03（具體數字撤回，per-pellet 設計意圖保留）
@@ -111,17 +112,44 @@ Status: 🔄 (b) 路線 RESOLVED 2026-05-03（30 武器 DPS 公式收斂）/ Q1/
 
 > ⚠️ **Reconciliation 2026-05-03**：CEO Q1 訊息「身體 150 / 爆頭 200」是描述舊單一 `Wraith` (90 dmg) 的設計。main 上現在有 **5 把 Sniper 武器**（Type="Sniper"），不能寫死 `weaponName == "Wraith"`，需改用 Type-based 機制。
 
-**main 上的 Sniper 系列**：
+#### 3.5.1 Sniper 系列現況 + Sprint 8b 落地後狀態
 
-| 武器 | Rarity | 現 Damage | 倍率 2.0x 後爆頭 | 對 200 HP 玩家 |
-|---|---|---|---|---|
-| Wraith Scout | Uncommon | 70 | 140 | 仍要 2 發爆頭 |
-| Wraith Hunter | Rare | 110 | 220 | **1 發秒殺** ✓ |
-| Wraith Frost | Epic | 140 | 280 | **1 發秒殺** ✓ |
-| Wraith Apex | Legendary | 170 | 340 | **1 發秒殺** ✓ |
-| Wraith Abyss | Demon | 210 | 420 | **1 發秒殺** ✓（已 Pierce）|
+> 📌 Sprint 8b 把 (b) 30 武器 retune 與 Sniper headshot 倍率**一起套用**。下表是 Sprint 8b **完成後**的合成狀態（body damage 來自 §4.2.3 retune，headshot = body × HEADSHOT_MULTIPLIER 2.0x）。
 
-**範圍**：Sprint 8b 只 `config.Type == "Sniper"` 套用 headshot 倍率。其他 Type（Pistol/SMG/Rifle/Shotgun/Knife/Minigun）爆頭 = 一般傷害（避免一次打亂 30 武器 TTK 預期）。
+| 武器 | Rarity | 現 Damage（pre-(b)） | post-(b) Body | post-(b) Body × 2.0x = Headshot | 對 200 HP 玩家爆頭 |
+|---|---|---|---|---|---|
+| Wraith Scout | Uncommon | 70 | **120** | **240** | 1 發秒殺 ✓ |
+| Wraith Hunter | Rare | 110 | **172** | **344** | 1 發秒殺 ✓ |
+| Wraith Frost | Epic | 140 | **190** | **380** | 1 發秒殺 ✓ |
+| Wraith Apex | Legendary | 170 | **206** | **412** | 1 發秒殺 ✓ |
+| Wraith Abyss | Demon | 210 | **220** | **440** | 1 發秒殺 ✓（Pierce）|
+
+> post-(b) Body 數值是 §4.2.3 範例公式推算（Sprint 8b 開工前由 `proposals/30-weapon-dps-retune.md` 細化拍板，可能 ±5%）。
+
+#### 3.5.2 ⚖️ 設計決議 D1（採用） vs D2（替代）
+
+合成狀態下 **Wraith Scout post-(b) 240 dmg 爆頭 > 200 HP**，Uncommon 也 1-shot。這跟原 §3.5 草案「Uncommon 仍要 2 發爆頭、Rare 起跳 1 發爆頭」的 milestone 框架打架。Reviewer 發現此矛盾，要求二擇一：
+
+**🎯 D1（預設採用）：全 Sniper 1-shot 爆頭**
+
+- 設計精神：「**Sniper Type 的識別性 = 1-shot 爆頭**」，不是稀有度 perk
+- Sniper 內部進階感受體現在：body TTK / Range / MagSize / Spread / 特殊機制（Wraith Abyss Pierce、Wraith Apex 560 stud 範圍）
+- 商店付費 gate 仍存在 — Sniper baseline 從 Uncommon 起跳，Wraith Scout 售價 1650 coins
+- 與 (b) 路線「收斂付費差距」精神一致
+- 最少特殊處理（CLAUDE.md §2 Simplicity First）
+
+**⚙️ D2（替代）：保留 Uncommon Wraith Scout 不 1-shot 的 milestone**
+
+實作需擇一：
+- (a) 把 Wraith Scout body damage 從 (b) 公式 120 拉低到 ≤99（例如 90），讓 90 × 2 = 180 < 200。**違反 (b) 公式**
+- (b) Sniper headshot multiplier 改為 rarity-tiered（Uncommon 1.5x、Rare+ 2.0x）。**新增 GameConfig.SNIPER_HEADSHOT_MULTIPLIER table**
+- (c) 接受 Wraith Scout 是「DPS 公式公平、爆頭威力低」的特例
+
+→ **預設採 D1**（已寫進本提案 §3.5、§4.2、workloads/04）。如 CEO 要 D2，請於 `30-weapon-dps-retune.md` 拍板時指定路線（推薦其中 (b) rarity-tiered 最乾淨）。
+
+#### 3.5.3 範圍
+
+Sprint 8b 只 `config.Type == "Sniper"` 套用 headshot 倍率。其他 Type（Pistol/SMG/Rifle/Shotgun/Knife/Minigun）爆頭 = 一般傷害（避免一次打亂 30 武器 TTK 預期）。
 
 **實作邏輯**（MatchManager.lua FireWeapon handler，**Type-based**）：
 ```lua
@@ -141,25 +169,28 @@ GameConfig.HEADSHOT_MULTIPLIER = 2.0  -- 目前只 Sniper 套用 (Sprint 8b)
 -- 不再為單一武器加 HeadshotDamage 欄位
 ```
 
-**Headshot multiplier — 待 CEO 拍板**：
+#### 3.5.4 Headshot multiplier — 待 CEO 拍板
 
-| 選項 | 倍率 | Wraith Scout (70) | Wraith Hunter (110) | Wraith Apex (170) | 評估 |
+倍率選項以 **post-(b) body damage** 為基礎評估（合成狀態，Sprint 8b 落地後實際遊戲體驗）：
+
+| 選項 | 倍率 | Wraith Scout post-(b) 120 | Wraith Hunter 172 | Wraith Apex 206 | 評估 |
 |---|---|---|---|---|---|
-| A: 1.33x | 嚴格遵守 CEO 200/150 比例 | 93 | 146 | 226 | 只 Demon Wraith Abyss 1-shot；過保守 |
-| **B: 2.0x（推薦）** | FPS 標準 | 140 | 220 | 340 | Rare+ 1-shot；商店升級「能秒殺」訊號明確 |
-| C: 固定 +200 | 直接加常數 | 270 | 310 | 370 | 全部 1-shot；模糊稀有度差距 |
+| A: 1.33x | 嚴格 CEO 200/150 比例 | 160（不 1-shot）| 229 | 274 | 對應 D2：Wraith Scout 不 1-shot；其他 Sniper 1-shot |
+| **B: 2.0x（推薦，配 D1）** | FPS 標準 | 240 | 344 | 412 | **全 Sniper 1-shot** ✓ |
+| C: 固定 +200 | 直接加常數 | 320 | 372 | 406 | 全 1-shot 但跟 body TTK 脫鉤 |
 
-**推薦 B**：與商店稀有度共振 — Uncommon 仍要 2 發爆頭、Rare 起跳 1 發爆頭，付費升級的「能秒殺人」是明確里程碑。
+**推薦 B + D1**：跟 (b) 路線「收斂付費差距」精神一致，Sniper Type 的識別性 = 1-shot 爆頭。Sniper 內部稀有度進階體現在 body TTK、Range、特殊機制。如 CEO 要 D2 milestone → 採 A 倍率（搭 rarity-tiered multiplier 為更乾淨選擇）。
 
-**邊界情況**：
+#### 3.5.5 邊界情況
 - NPC 戴的 hat/hood/helmet accessory 命中 hitPart.Name 不是 "Head" → 不算爆頭（吃到頭盔擋下，合理）
 - `Wraith Abyss` 有 `Pierce=true`（穿透），headshot 邏輯每根 raycast 命中各自判斷
 - Thunder 系列 (Type="Shotgun") 不套用 headshot（多 pellet 命中很難判定首發是頭，且打亂霰彈定位）
 
-**驗證項目**：
-- [ ] Wraith Scout 對 200 HP 玩家：身體 70 / 爆頭 140（仍存活）
-- [ ] Wraith Hunter 對 200 HP 玩家：身體 110 / 爆頭 220（**秒殺** ✓）
-- [ ] Wraith Hunter 對 Patrol 120 HP NPC：爆頭 220 一發殺 / 身體 110 兩發
+#### 3.5.6 驗證項目（D1 + B 倍率假設）
+- [ ] post-(b) Wraith Scout 對 200 HP 玩家：身體 120 / 爆頭 240（**秒殺** ✓）
+- [ ] post-(b) Wraith Hunter 對 200 HP 玩家：身體 172 / 爆頭 344（**秒殺** ✓）
+- [ ] post-(b) Wraith Hunter 對 Patrol 120 HP NPC：爆頭一發殺 / 身體一發殺（172 > 120）
+- [ ] post-(b) 全 5 把 Sniper 對 200 HP 玩家爆頭都秒殺
 - [ ] 其他 Type（Rifle/SMG/Pistol/Shotgun/Knife/Minigun）命中 Head part = 一般傷害（無加成）
 - [ ] Wraith Abyss Pierce 多人命中：每人各自判 headshot
 

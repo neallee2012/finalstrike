@@ -39,10 +39,23 @@ sprint_8b_changes:
   headshot_system:
     scope: "ONLY config.Type == 'Sniper' — 5 把 Wraith 系列"
     multiplier_proposed: 2.0
+    # 倍率以 post-(b) body damage 為基礎評估（合成狀態下實際遊戲體驗）。
+    # 詳見 proposals/sprint-8-200hp-balance.md §3.5.4。
     multiplier_options:
-      A: { value: 1.33, common_to_demon_1shot: false, evaluation: "嚴格遵守 CEO 200/150 比例，過保守" }
-      B: { value: 2.00, common_to_demon_1shot: "Rare+", evaluation: "FPS 標準；推薦 — Rare 起跳 1 發爆頭" }
-      C: { value: "+200 fixed", evaluation: "全部 1-shot，模糊稀有度差距" }
+      A: { value: 1.33,
+           wraith_scout_post_b_headshot: 160,
+           wraith_scout_oneshot: false,
+           other_snipers_oneshot: true,
+           pairs_with: D2,
+           evaluation: "Wraith Scout 不 1-shot；其他 Sniper 1-shot — 對應 D2 milestone" }
+      B: { value: 2.00,
+           wraith_scout_post_b_headshot: 240,
+           wraith_scout_oneshot: true,
+           other_snipers_oneshot: true,
+           pairs_with: D1,
+           evaluation: "FPS 標準；全 Sniper 1-shot 爆頭 — 推薦，配 D1" }
+      C: { value: "+200 fixed",
+           evaluation: "全 Sniper 1-shot 但跟 body TTK 脫鉤；不推薦" }
     rationale_for_type_based: |
       Reconciliation 2026-05-03：原 contract 寫 'weaponName == "Wraith"'
       但 main 已有 5 把 Sniper（Wraith Scout/Hunter/Frost/Apex/Abyss）。
@@ -56,12 +69,25 @@ sprint_8b_changes:
     config_addition: |
       GameConfig.HEADSHOT_MULTIPLIER = 2.0
       （不再為單一武器加 HeadshotDamage 欄位）
+    # 採設計決議 D1（見 proposals/sprint-8-200hp-balance.md §3.5.2）：
+    # 全 Sniper post-(b) retune 後爆頭都 1-shot 200 HP 玩家。
+    # body_after_b 數值是 §4.2.3 範例公式推算，Sprint 8b 開工前由
+    # proposals/30-weapon-dps-retune.md 細化拍板（可能 ±5%）。
     sniper_headshot_table_at_2x:
-      "Wraith Scout":  { rarity: Uncommon,  body_after_b: "TBD", headshot_at_2x: "TBD body * 2", oneshot_200hp: false }
-      "Wraith Hunter": { rarity: Rare,      body_after_b: "TBD", headshot_at_2x: "TBD body * 2", oneshot_200hp: true }
-      "Wraith Frost":  { rarity: Epic,      body_after_b: "TBD", headshot_at_2x: "TBD body * 2", oneshot_200hp: true }
-      "Wraith Apex":   { rarity: Legendary, body_after_b: "TBD", headshot_at_2x: "TBD body * 2", oneshot_200hp: true }
-      "Wraith Abyss":  { rarity: Demon,     body_after_b: "TBD", headshot_at_2x: "TBD body * 2", oneshot_200hp: true, special: "Pierce=true" }
+      "Wraith Scout":  { rarity: Uncommon,  body_after_b_estimate: 120, headshot_at_2x: 240, oneshot_200hp: true }
+      "Wraith Hunter": { rarity: Rare,      body_after_b_estimate: 172, headshot_at_2x: 344, oneshot_200hp: true }
+      "Wraith Frost":  { rarity: Epic,      body_after_b_estimate: 190, headshot_at_2x: 380, oneshot_200hp: true }
+      "Wraith Apex":   { rarity: Legendary, body_after_b_estimate: 206, headshot_at_2x: 412, oneshot_200hp: true }
+      "Wraith Abyss":  { rarity: Demon,     body_after_b_estimate: 220, headshot_at_2x: 440, oneshot_200hp: true, special: "Pierce=true" }
+    design_decision_d1: |
+      D1 採用：全 Sniper Type 1-shot 爆頭。Sniper 內部稀有度進階靠 body TTK / Range /
+      MagSize / 特殊機制（Pierce），不靠爆頭差異化。與 (b) 路線「收斂付費差距」精神一致。
+    design_decision_d2_alt: |
+      D2 替代（CEO 若要保留 Wraith Scout 不 1-shot 的 milestone）：
+      (a) 把 Wraith Scout body damage 拉低至 ≤99（違反 (b) 公式）
+      (b) Sniper headshot multiplier 改 rarity-tiered（Uncommon 1.5x、Rare+ 2.0x）— 推薦
+      (c) Wraith Scout 為 floor + multiplier ceiling 特例
+      預設不採。CEO 於 30-weapon-dps-retune.md 拍板時可改決議。
     npc_compat: |
       R15 NPC 也有 Head part，命名一致 → 玩家 vs NPC 也適用。
       NPC 戴的 hat/hood/helmet accessory 命中時 hitPart.Name 不是 "Head" → 不算爆頭（合理）。
