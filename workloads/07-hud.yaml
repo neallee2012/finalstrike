@@ -1,7 +1,29 @@
 name: HUD
 owner: claude-code
 priority: P1-polish
-status: ✅ DONE (Sprint 4)
+status: ✅ DONE (Sprint 4) | 🔄 MINOR UPDATE (Sprint 8 — maxHP=200 適配) | 🆕 ARMOR OVERLAY (Sprint 9)
+
+# ============= Sprint 8 計劃中的修改（小） =============
+sprint_8_changes:
+  goal: "HP 條最大值從 100 → 200，視覺顯示維持比例"
+  expected_changes:
+    - "如果 HUDController.lua 用 maxHP 參數計算寬度比例 → 不需改"
+    - "如果硬編碼 100 → 改成讀 GameConfig.MAX_HP 或從 HealthUpdate event 第二參數讀"
+  stages:
+    - verify: HUD 條顯示 200/200 而非 100/100
+    - verify: 顏色閾值 >60% 綠 / >30% 黃 / ≤30% 紅 在 200 HP 維持比例（120/60 切點）
+    - verify: 數字文字「HP: 200」可讀
+
+# ============= Sprint 9 計劃 =============
+sprint_9_changes:
+  goal: "護甲條 overlay 加在 HP 條上方，用藍/銀色區分"
+  details:
+    - "新增 ArmorUpdate RemoteEvent listener"
+    - "HP 條上方薄條顯示 0–50 護甲，滿時 50/50 銀色"
+    - "受傷時護甲先扣（藍色閃爍），HP 後扣"
+  blocked_by: "workloads/11-armor-system.yaml — 待 CEO 拍板 Q4"
+
+# ============= 已完成的歷史 =============
 stages:
   - define: UI 元素清單
   - implement: HP 血量條 (顏色隨血量變化)

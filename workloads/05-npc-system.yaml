@@ -1,21 +1,79 @@
 name: NPCSystem
 owner: claude-code
 priority: P0-prototype
-status: ✅ DONE (Sprint 3)
+status: ✅ DONE (Sprint 3 + Sprint 7 R15 mesh) | 🔄 REBALANCE PLANNED (Sprint 8)
+
+# ============= Sprint 8 計劃中的修改 =============
+# 詳見 proposals/sprint-8-200hp-balance.md §4.3
+sprint_8_changes:
+  goal: "玩家 200 HP 後，NPC HP 與傷害需要對應拉高，否則 PvE 會變得太簡單"
+  hp_damage_table:
+    Patrol:  { hp_current: 60,  hp_target: 120, dmg_current: 10, dmg_target: 18, speed: 12, note: "純 ×2 + 略強傷害" }
+    Armored: { hp_current: 150, hp_target: 300, dmg_current: 15, dmg_target: 28, speed: 8,  note: "×2，強化定位" }
+    Elite:   { hp_current: 250, hp_target: 500, dmg_current: 25, dmg_target: 40, speed: 14, note: "×2，繼續是高風險高獎勵" }
+  alt_proposal: "提案值 100/220/350 HP（+66%/+47%/+40%）相對 ×2 較弱，建議拍板採 ×2 — 待 CEO 確認"
+
+  # main 改動：NPC 已會持槍（commit 253863f），不再空手攻擊
+  npc_weapon_compat: |
+    main 上 NPC 已加 NPCWeaponEffectsClient + 'turn to face player before firing'。
+    Sprint 8b 不動 NPC 武器系統，只調整 NPC HP/Damage 數值。
+    NPC 用什麼武器 / 火力視覺由 main 上 6236cc1 commit 已實作。
+  loot_table_updates:
+    # ⚠️ Reconciliation 2026-05-03: main 已移除 Weapon drop（武器只能商店買）。
+    # NPC LootTable 只保留 Ammo / Coin / Medkit。Sprint 8b 把 Medkit 拆成 4 階。
+    # main 現況（基準）:
+    #   Patrol:  { Ammo=0.7, Coin=0.3 }
+    #   Armored: { Ammo=0.5, Coin=0.3, Medkit=0.2 }
+    #   Elite:   { Ammo=0.3, Coin=0.4, Medkit=0.3 }
+    Patrol:
+      Ammo: 0.50
+      MedkitSmall: 0.25   # 新（Heal 50）
+      Coin: 0.20
+    Armored:
+      Ammo: 0.50
+      Medkit: 0.35        # 標準（Heal 100）
+      Coin: 0.35
+    Elite:
+      Ammo: 0.40
+      MedkitLarge: 0.50   # 新（Heal 150）
+      MedkitFull: 0.05    # 新（Heal 200，極稀有，待 CEO 拍板）
+      Coin: 0.50
+    weapon_drop_removed: true
+    weapon_drop_reason: "main commit 5928547 改成 shop-only 經濟，weapon drop 已從 GameConfig.LOOT 移除"
+  stages:
+    - define: 3 種 NPC 新 HP / Damage
+    - implement: GameConfig.ENEMIES 更新 HP / Damage / LootTable
+    - implement: dropLoot 對應 4 階 medkit type（MedkitSmall / Medkit / MedkitLarge / MedkitFull）
+    - verify: 玩家 200 HP 站樁被 Patrol 攻擊 → HP 歸零時間約 ~7s（vs 現在 ~4s）
+    - verify: Phantom 步槍打 Patrol（120 HP / 45 dmg）= 3 發殺
+    - verify: 9 NPC（4 Patrol/3 Armored/2 Elite）配置不變，只改數值
+  new_success_criteria:
+    - Patrol 120 HP / 18 dmg / Speed 12
+    - Armored 300 HP / 28 dmg / Speed 8
+    - Elite 500 HP / 40 dmg / Speed 14
+    - 9 NPC spawn 數量配置不變
+    - dropLoot 4 階 medkit type 對應正確 LootSystem.createPickup 顏色
+  decision_pending:
+    - "提案值 vs ×2 值（推薦 ×2）"
+
+# ============= 已完成的歷史 =============
 stages:
   - define: 3 種 R15 NPC (Patrol/Armored/Elite)
-  - implement: R15 骨架 + Motor6D joints
-  - implement: AI 巡邏/偵測/追擊/攻擊
+  - implement: R15 character mesh via Players:CreateHumanoidModelFromDescription (Sprint 7)
+  - implement: per-type body color + programmatic accessories (Sprint 7)
+  - implement: AI 巡邏 / 偵測 / Pathfinding 追擊 / 攻擊
   - implement: 被擊敗掉落戰利品
   - verify: NPC 巡邏 → 偵測玩家 → 追擊 → 攻擊 → 死亡掉寶
 success_criteria:
-  - Patrol 60HP, Armored 150HP, Elite 250HP
-  - R15 骨架完整（15 parts + Motor6D）
-  - 偵測範圍內追擊，攻擊範圍內造成傷害
+  - Patrol 60HP, Armored 150HP, Elite 250HP (Sprint 8 將翻倍)
+  - R15 character mesh + 自動 BodyColors + Animate LocalScript（內建）
+  - 三種 NPC 衣裝差異化（Patrol 警衛帽+徽章 / Armored 戰術頭盔+背心 / Elite 兜帽+紅徽記+披風）
+  - 偵測範圍內 Pathfinding 追擊，攻擊範圍內造成傷害
   - 死亡後根據 LootTable 掉落物品
 artifacts:
   - src/ServerScriptService/NPCSystem.lua
   - src/ReplicatedStorage/GameConfig.lua (enemy data)
 recovery:
-  - NPC 不動 → 確認 HumanoidRootPart 存在 + Motor6D 完整
-  - NPC 穿牆 → 檢查 CanCollide 設定
+  - NPC 不動 → 確認 HumanoidRootPart 存在 + Pathfinding agent params 對齊 R15 size
+  - NPC 穿牆 → 用 PathfindingService 而非直接 MoveTo (Sprint 6 lesson)
+  - HumanoidDescription.Shirt 看起來都同款 → 用 programmatic accessories 替代，shirt 只認 classic 2D Shirt asset (Sprint 7 lesson)

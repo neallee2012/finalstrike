@@ -1,7 +1,43 @@
 name: PlayerHealth
 owner: claude-code
 priority: P0-prototype
-status: ✅ DONE (Sprint 2)
+status: ✅ DONE (Sprint 2) | 🔄 REBALANCE PLANNED (Sprint 8b — 200 HP)
+
+# ============= Sprint 8b 計劃中的修改（CEO 決議 b 後重寫 2026-05-03） =============
+# 詳見 proposals/sprint-8-200hp-balance.md
+# Sprint 8a 衛生補課完成後執行 Sprint 8b
+sprint_8b_changes:
+  goal: "玩家 100 HP → 200 HP，降低秒殺挫折感；4 階補血搭配；武器側 TTK 由 30-weapon-dps-retune 處理（不在本 contract）"
+  scope_boundary: |
+    本 contract 只負責 PlayerHealth API 與 maxHP=200 適配。
+    武器 TTK 驗證屬於 workloads/04-weapon-system.yaml 範圍，
+    具體 30 武器數值見 proposals/30-weapon-dps-retune.md。
+  stages:
+    - define: 200 HP 上限 + 4 階補血回血量
+    - implement: GameConfig.MAX_HP 100 → 200
+    - implement: initPlayerData 起始 200 HP
+    - implement: healPlayer 對應 4 種 medkit type 不同回血量（50/100/150/200）
+    - implement: HUD 血量條顯示適配 maxHP=200（顏色閾值用比例不需改）
+    - verify: 玩家初始化 HP/MaxHP 都是 200
+    - verify: HealthUpdate event 廣播 (current=200, max=200) 給 client
+    - verify: 4 階 medkit cap 在 MAX_HP；MedkitFull (200) 從 0 HP 補滿
+    - verify: NPC 攻擊頻率不變的情況下，玩家被 1 隻 Patrol 站樁攻擊存活時間約現在的 2x
+      (具體秒數隨 NPC dmg ×2 後的 Sprint 8b 設定而定，見 workloads/05-npc-system.yaml)
+    - verify: 武器側 TTK 屬於 workloads/04 驗證範圍，不在本 contract
+  new_success_criteria:
+    - "起始 200 HP（而非 100）"
+    - "4 階補血量正確：MedkitSmall=50 / Medkit=100 / MedkitLarge=150 / MedkitFull=200"
+    - "HP 不能超過 200（cap 邏輯不變）"
+    - "HP 條紅黃綠閾值維持比例計算（>60%=綠, >30%=黃, ≤30%=紅）"
+    - "playerData.HP/MaxHP 在 initPlayerData / healPlayer / damagePlayer / resetToLobby 各路徑都正確"
+  decision_pending:
+    - "NPC 數值用 ×2 值 — 推薦 ×2 (workloads/05 範圍)"
+    - "MedkitFull 是否 5% drop on Elite (workloads/06 範圍)"
+  withdrawn:
+    - "原寫『Phantom 5 發殺、Viper 6 發、Wraith 2 發』— 撤回 (基於 Sprint 7 之前 6 武器世界，main 已是 30 武器，TTK 數字由 proposals/30-weapon-dps-retune.md 處理)"
+    - "原寫『Wraith 2 發殺 150 dmg vs 200 HP』— 撤回 (改 Type-based headshot multiplier，見 §3.5)"
+
+# ============= 已完成的歷史 =============
 stages:
   - define: 100 HP 系統 + 淘汰機制
   - implement: damagePlayer / healPlayer API
@@ -9,8 +45,8 @@ stages:
   - implement: 被淘汰者不影響比賽中玩家
   - verify: HP 歸零 → 淘汰 → 傳送觀戰區
 success_criteria:
-  - 起始 100 HP
-  - 醫療包回 50 HP，cap 100
+  - 起始 100 HP（Sprint 8 將改 200）
+  - 醫療包回 50 HP，cap 100（Sprint 8 將改 4 階）
   - HP 歸零標記 Eliminated
   - 淘汰後傳送觀戰區
 artifacts:
@@ -18,3 +54,4 @@ artifacts:
   - src/ServerScriptService/MatchManager.lua (health handlers)
 recovery:
   - 淘汰後仍可傷害他人 → 檢查 Eliminated flag
+  - HP 顯示異常 → 確認 HealthUpdate event 在 GameEvents 建立
