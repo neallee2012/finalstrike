@@ -4,6 +4,13 @@
 --   - Attachment "Muzzle" at the end of the barrel (used as raycast/VFX origin)
 -- Visual style matches the dark cinematic theme: dark gray/black bodies with
 -- subtle accent neon for visibility against the cinematic backdrop.
+--
+-- 30 weapons share 6 underlying mesh builders, dispatched by Config.Type
+-- (see TYPE_TO_BUILDER below). Per-weapon distinct meshes are deferred to a
+-- polish sprint — fixes #9 (Stage 1 rename broke direct name lookup).
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local GameConfig = require(ReplicatedStorage:WaitForChild("GameConfig"))
 
 local WeaponMeshes = {}
 
@@ -175,14 +182,32 @@ function builders.Fang()
 	return m, handle, addMuzzle(handle, Vector3.new(0, 0.4, -1.3))
 end
 
+-- 30 named weapons map to 6 underlying meshes by Type. Same SMG mesh serves
+-- Stinger Mk2 / Stinger Tac / Stinger Storm / Hailstorm (minigun gets SMG
+-- mesh as placeholder until a proper minigun mesh is built).
+local TYPE_TO_BUILDER = {
+	Pistol  = builders.Viper,
+	SMG     = builders.Stinger,
+	Rifle   = builders.Phantom,
+	Shotgun = builders.Thunder,
+	Sniper  = builders.Wraith,
+	Knife   = builders.Fang,
+	Minigun = builders.Stinger,  -- placeholder
+}
+
 -- Public: build(weaponName) -> Tool (Handle is the BasePart, Muzzle is an
 -- Attachment on the Handle). Wrapping as a Tool lets Roblox's built-in grip
 -- system handle the hand pose; we set Tool.Grip so the player's hand sits at
 -- the top of the grip with barrel pointing forward.
--- Returns nil for unknown weapon names.
+-- Returns nil for unknown weapon names or weapons with no Type-mapped builder.
 function WeaponMeshes.build(weaponName)
-	local fn = builders[weaponName]
-	if not fn then return nil end
+	local cfg = GameConfig.WEAPONS[weaponName]
+	if not cfg then return nil end
+	local fn = TYPE_TO_BUILDER[cfg.Type]
+	if not fn then
+		warn("[WeaponMeshes] No builder for Type=" .. tostring(cfg.Type) .. " (weapon: " .. weaponName .. ")")
+		return nil
+	end
 	local model, handle = fn()
 
 	-- Convert Model wrapper to a Tool. Tool wants Handle as a direct child
