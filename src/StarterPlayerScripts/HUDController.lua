@@ -11,15 +11,13 @@ local player = Players.LocalPlayer
 local events = ReplicatedStorage:WaitForChild("GameEvents")
 
 -- ====== CREATE HUD ======
+-- Main HUD ScreenGui keeps the default IgnoreGuiInset=false so existing widgets
+-- (HP bar at bottom, alive count + currency at top, kill feed, announcement, etc.)
+-- stay in their authored positions relative to the inset-aware coordinate space.
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "FinalStrikeHUD"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
--- IgnoreGuiInset=true so the crosshair at UDim2(0.5, _, 0.5, _) aligns with
--- camera.CFrame.LookVector (real viewport center). Without this, the crosshair
--- sits ~18px below true center because of the top-bar inset, and shots aim
--- slightly above what the player thinks they're targeting (#13).
-screenGui.IgnoreGuiInset = true
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
 -- === HP BAR ===
@@ -255,20 +253,33 @@ local function showWinner(text)
 end
 
 -- === CROSSHAIR ===
+-- Lives in its own ScreenGui with IgnoreGuiInset=true so the crosshair at
+-- UDim2(0.5, _, 0.5, _) lines up with camera.CFrame.LookVector (real viewport
+-- center). Without this, the crosshair sits ~18px below true center because of
+-- the top-bar inset, and shots aim slightly above what the player thinks they
+-- are targeting (#13). Kept in a separate ScreenGui so the inset adjustment
+-- doesn't affect the rest of the HUD layout (which is authored against the
+-- inset-aware coordinate space).
+local crosshairGui = Instance.new("ScreenGui")
+crosshairGui.Name = "FinalStrikeCrosshair"
+crosshairGui.ResetOnSpawn = false
+crosshairGui.IgnoreGuiInset = true
+crosshairGui.Parent = player.PlayerGui
+
 local crosshair = Instance.new("Frame")
 crosshair.Name = "Crosshair"
 crosshair.Size = UDim2.new(0, 2, 0, 20)
 crosshair.Position = UDim2.new(0.5, -1, 0.5, -10)
 crosshair.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 crosshair.BorderSizePixel = 0
-crosshair.Parent = screenGui
+crosshair.Parent = crosshairGui
 
 local crosshairH = Instance.new("Frame")
 crosshairH.Size = UDim2.new(0, 20, 0, 2)
 crosshairH.Position = UDim2.new(0.5, -10, 0.5, -1)
 crosshairH.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 crosshairH.BorderSizePixel = 0
-crosshairH.Parent = screenGui
+crosshairH.Parent = crosshairGui
 
 -- ====== EVENT HANDLERS ======
 events:WaitForChild("HealthUpdate").OnClientEvent:Connect(function(hp, maxHP)
