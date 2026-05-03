@@ -1,0 +1,91 @@
+name: DailyQuestService
+owner: claude-code
+priority: P1-economy
+status: ✅ DONE (Sprint 8 — commit 5928547，Sprint 8a 補檔)
+backfill_receipt: receipts/sprint-8-shop-economy-fps.md
+backfill_note: |
+  此 contract 為 Sprint 8a 衛生補課產出。實際實作已於 main commit 5928547 完成。
+
+# ============= 系統定位 =============
+purpose: |
+  每日任務系統。玩家完成指定行為（打 NPC / 存活 / 玩比賽 / 拾取等）累計進度，
+  達標後可 claim 子彈幣獎勵（**bypass per-match cap**）。每日 UTC midnight 重置。
+
+# ============= 規格 =============
+data_store:
+  store_name: PlayerDailyQuests_v1
+  key: tostring(player.UserId)
+  value:
+    Date: "YYYY-MM-DD UTC"
+    Progress: { questId = current_progress }
+    Claimed: { questId = true }
+
+quest_definitions_source: GameConfig.DAILY_QUESTS
+current_quests:
+  - { Id: "play3matches",  Name: "完成 3 場比賽",     EventType: "MatchComplete",  Target: 3,   Reward: 300 }
+  - { Id: "kill20npcs",    Name: "擊敗 20 隻 NPC",    EventType: "NpcKill",        Target: 20,  Reward: 250 }
+  - { Id: "survive10min",  Name: "存活總共 10 分鐘",  EventType: "SurviveSeconds", Target: 600, Reward: 300 }
+  - { Id: "kill3players",  Name: "擊敗 3 位玩家",     EventType: "PlayerKill",     Target: 3,   Reward: 400 }
+  - { Id: "top3once",      Name: "進入前 3 名一次",   EventType: "Top3Placement",  Target: 1,   Reward: 500 }
+  - { Id: "pickup5loot",   Name: "拾取 5 個戰利品",   EventType: "LootPickup",     Target: 5,   Reward: 250 }
+
+reset_strategy: |
+  Lazy reset，不用背景 timer：
+  - recordEvent / load / claim 進入時呼叫 ensureFreshDay()
+  - 若 entry.Date != todayUTC() → Progress + Claimed 清空，Date 更新
+  - 玩家跨 midnight 在線時自動觸發
+
+event_emission_points:
+  MatchComplete: MatchManager.endMatch
+  NpcKill: NPCSystem dropLoot 觸發前
+  SurviveSeconds: MatchManager.startMatch task.spawn 計時器
+  PlayerKill: MatchManager.eliminatePlayer (when killer is player)
+  Top3Placement: MatchManager 計算 placement 後
+  LootPickup: LootSystem.createPickup Touched handler
+
+api:
+  getState: "(player) -> { Date, Progress, Claimed }"
+  recordEvent: |
+    (player, eventType, count) — 增加所有 EventType match 的 quest 進度
+    cap 在 quest.Target，避免 Progress 無上限增長
+  tryClaim: |
+    (player, questId) -> success: bool, reason: string
+    Reason: "ok" / "unknown" / "incomplete" / "claimed" / "noservice"
+    成功時呼叫 CurrencyService.addDailyReward (bypass match cap)
+
+remote_events:
+  ClaimDailyQuest: "client → server; questId"
+  ClaimDailyQuestResult: "server → client; (success, reason, questId)"
+  DailyQuestUpdate: "server → client; broadcasts {Date, Progress, Claimed}"
+  GetDailyQuests: "RemoteFunction; client polls initial state"
+
+artifacts:
+  - src/ServerScriptService/DailyQuestService.lua  (180 行)
+  - src/StarterPlayerScripts/DailyQuestUI.lua  (243 行)
+  - src/ReplicatedStorage/GameConfig.lua  (DAILY_QUESTS block)
+  - src/ServerScriptService/GameEventsBootstrap.lua  (Claim* + DailyQuestUpdate + GetDailyQuests events)
+  - src/ServerScriptService/MatchManager.lua  (recordQuest helper + 各 hook)
+
+success_criteria:
+  - "6 種任務在 DailyQuestUI 中正確顯示進度條"
+  - "完成任務後可 claim，重複 claim 拒絕（'claimed'）"
+  - "未達標 claim 拒絕（'incomplete'）"
+  - "Daily reward 不受 MatchTotal cap 限制（bypass via addDailyReward）"
+  - "UTC midnight 跨日 → 玩家若仍在線，next event 觸發 reset Progress + Claimed"
+  - "重進遊戲後 progress 持久化到 DataStore"
+
+recovery:
+  - "進度沒更新 → recordEvent 是否在對應 hook 點被呼叫；EventType 字串拼對"
+  - "claim 沒收到錢 → CurrencyService.addDailyReward 是否載入"
+  - "reset 沒觸發 → ensureFreshDay 邏輯（Date 字串比對 UTC 日期）"
+
+# ============= 依賴 =============
+dependencies:
+  upstream:
+    - GameConfig.DAILY_QUESTS
+    - CurrencyService (addDailyReward)
+  downstream: []
+  emitted_by:
+    - MatchManager (MatchComplete / SurviveSeconds / PlayerKill / Top3Placement)
+    - NPCSystem (NpcKill)
+    - LootSystem (LootPickup)

@@ -112,13 +112,21 @@ PvE 蒐集階段 (180秒) → PvP 淘汰賽 → 最後存活者獲勝。
 4. PvP — 玩家互相攻擊，淘汰不重生
 5. Match End — 宣布勝者，8 秒後回大廳
 
-## 武器數據
-- Viper (手槍): 25 dmg, 半自動
-- Stinger (衝鋒槍): 15 dmg, 全自動
-- Phantom (步槍): 30 dmg, 全自動
-- Thunder (霰彈槍): 12×8 pellets, 半自動
-- Wraith (狙擊槍): 90 dmg, 慢射速
-- Fang (小刀): 40 dmg, 近戰
+## 武器系統（Sprint 8 — 30 武器商店）
+- 30 把武器分 6 個稀有度：Common (5) / Uncommon (5) / Rare (5) / Epic (6) / Legendary (5) / Demon (4)
+- DPS 倍率：Common 1.0x / Uncommon 1.25x / Rare 1.55x / Epic 1.95x / Legendary 2.40x / Demon 3.00x
+  - **Sprint 8b 計劃改為 1.0/1.15/1.30/1.50/1.70/1.90（CEO 決議 b，收斂付費差距）**
+- Type：Pistol / SMG / Rifle / Shotgun / Sniper / Knife / Minigun
+- 玩家經商店購買（CurrencyService.spend），STARTER_WEAPONS = ["Viper Mk1", "Fang Scout"]
+- 武器掉落已移除（NPC drop 只剩 Ammo / Coin / Medkit）
+- 詳見 `workloads/04-weapon-system.yaml` + `workloads/13-shop-service.yaml` + `GameConfig.WEAPONS`
+- 命名範例：Viper Mk1 (Common), Wraith Scout (Uncommon), Phantom Apex (Epic), Hailstorm (Legendary Minigun), Wraith Abyss (Demon)
+
+## 經濟系統（Sprint 8 — 子彈幣）
+- 子彈幣（BulletCoins）持久化儲存：CurrencyService → DataStore PlayerCurrency_v1
+- 比賽中 anti-farming：MatchCaps（NpcKills 300 / Survival 200 / PlayerKills 600 / Total 1500）
+- Daily quest：6 個任務 + UTC midnight reset，獎勵 bypass match cap（DailyQuestService）
+- 武器商店：30 把武器，價格 300（Viper Mk1）→ 55,000（Thunder Bloodmoon Demon）（ShopService）
 
 ## NPC 類型
 - Patrol: 60 HP, 低傷害, 基本戰利品
@@ -147,3 +155,21 @@ _隨開發進度持續更新_
 - ReplicatedStorage 的 Script 預設 RunContext=Legacy 不會自動執行；bootstrap 腳本放 ServerScriptService 比較安全
 - Bootstrap script 不可與它在 runtime 建立的物件同名 — `WaitForChild` 會回傳第一個（通常是 Script），下游路徑全錯。慣例：`<Name>Bootstrap`
 - 持久化 HUD/UI：LocalScript 放 StarterPlayerScripts（每個玩家只跑一次），不要放 StarterGui（每次重生 clone 一份）。ScreenGui 也要 `ResetOnSpawn = false`
+
+### Sprint 8 補充（補檔 2026-05-03，詳見 receipts/sprint-8-shop-economy-fps.md）
+- **武器 raycast origin 改用 camera viewport center 而非 Muzzle.WorldPosition**：Sprint 7 從 muzzle 發射雖然「視覺合理」但與螢幕中心 crosshair 不對齊（muzzle 在槍身右側 → bullet 飄）。Sprint 8 改回 camera center + crosshair-aligned direction（推翻 Sprint 7 的「camera→muzzle」決定，issue #5/6/7）
+- **FPS LockFirstPerson 隱藏所有 body parts**：CameraScript 設 `LocalTransparencyModifier=1` 在所有 body parts 上 → 玩家看不到自己的手。每 frame `RenderStepped` 強制 6 個 arm parts (Left/Right Upper/Lower/Hand) `LocalTransparencyModifier=0` 才能可見
+- **LeftHand IK 必須 Priority 1000**：默認 priority 會被 jump animation 的 LeftArm track 蓋掉，玩家跳起時左手會脫離武器（issue #12）
+- **MouseBehavior LockCenter 過渡時要強制 Default 一段時間**：`CameraMode = Classic` 後，內建 CameraScript 仍會延續 LockCenter 數 frames。退出第一人稱時設 `releaseEnforceUntil = tick() + 1.0`，`RenderStepped` 在這 1 秒內持續強制 Default，否則鼠標被搶回 LockCenter，shop / 觀戰點不到 UI（issue #14, #15）
+- **Interactive UI 開啟時必須臨時釋放 MouseBehavior**：LockCenter 會吞掉 click，shop / daily-quest UI 開啟期間要切回 Default 才能點 UI 按鈕。連 GUI Enabled signal 偵測比監聽整個 InputService 更便宜
+- **Crosshair 必須在自己的 ScreenGui**：HUD 主 ScreenGui 隱藏時 crosshair 也跟著隱藏 → 不該。隔離成獨立 ScreenGui (`FinalStrikeCrosshair`) 才能獨立控制（reviewer #13 要求）
+- **Crosshair 的 4 segment 必須開中心**：CEO 提出 「open-center 4-segment」spec — 中心空，4 條黑線從中心向外延伸（commit d054043）。實作時要 `GuiInset` 處理偏移
+- **NPC 攻擊前必須 face 玩家**：PathfindingService 路徑用 humanoid:MoveTo 後在攻擊範圍內停下，character orientation 卡在上一個 waypoint 方向 → 從側面開槍視覺超怪。攻擊邏輯內 `HumanoidRootPart.CFrame = CFrame.lookAt(currentPos, playerPos.WithSameY)` 修正（issue #19）
+- **NPC 武器視覺 (muzzle flash + tracer) 用 client-only**：12 個 NPC 同時開火 = 24+ Parts replicate，效能爆。改成 server fire RemoteEvent → client 各自 spawn local Parts + Debris:AddItem 自動清理。FX 永遠不 replicate
+- **DataStore Studio playtest 注意 API Services**：Game Settings → Security → Enable Studio Access to API Services 要啟用，否則 GetAsync/SetAsync 失敗。Code 要 graceful（warning 不 crash），玩家從 0 起算
+- **DataStore 不要每個動作都 SetAsync**：throttling 風險高。spend / addCoins / quest progress 都更新 in-memory，PlayerRemoving + BindToClose 才批次寫入。Crash 中失去 session 增量是 acceptable tradeoff
+- **Persistent state DataStore 用 v1 後綴命名**：未來 schema migration 不用改名 — 例如 `PlayerCurrency_v1` → `PlayerCurrency_v2`，老 store 留著參考
+- **Daily quest reset 用 lazy 不用 background timer**：玩家可能跨 UTC midnight 在線。`recordEvent / load / claim` 進入時呼叫 `ensureFreshDay()` 比較簡單可靠，不會錯過 reset
+- **HP reset on death 不靠 Roblox spawn**：Roblox `Humanoid.Died` 觸發 spawn 重置會干擾 spectator camera。改為 server 端手動 setter — `data.HP = data.MaxHP` 在 `eliminatePlayer` 後（commit 253863f）
+- **PR 開太多時注意 work truth vs execution truth 脫節**：Sprint 8 在 PR #23 寫設計提案期間 main 跑進 12 commits，作者不知道 30-weapon shop 已存在。導致提案基於「6 武器世界」假設，merge 前 PR review 抓到嚴重矛盾。Lesson：每次開新提案 PR 前先 `git fetch + git log HEAD..origin/main` audit
+- **Workload contracts 是 PR review 的設計地圖**：Sprint 8 期間實作 8 個新 .lua 檔案但沒補對應 contract → Sprint 8b 設計時不知道 main 已是 30 武器世界。Sprint 8a 補檔 5 份 contract（workloads/12–16）+ 1 份 receipt（receipts/sprint-8-shop-economy-fps.md）對齊。原則：每個新系統 .lua 必須有對應 workload contract，違反 = work truth 與 execution truth 脫節

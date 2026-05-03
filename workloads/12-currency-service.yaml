@@ -1,0 +1,95 @@
+name: CurrencyService
+owner: claude-code
+priority: P1-economy
+status: ✅ DONE (Sprint 8 — commit 5928547，Sprint 8a 補檔)
+backfill_receipt: receipts/sprint-8-shop-economy-fps.md
+backfill_note: |
+  此 contract 為 Sprint 8a 衛生補課產出。實際實作已於 main commit 5928547
+  「feat(shop): bullet coin economy + 30-weapon shop + daily quests」完成，
+  當時未補對應 workload contract，違反 Peter Pangg AI-First 框架「Receipt 是
+  一級物件」原則。本 contract 補回設計意圖記錄。
+
+# ============= 系統定位 =============
+purpose: |
+  子彈幣（BulletCoins）持久化儲存 + 比賽中 anti-farming 上限。
+  玩家擊敗 NPC / 玩家、存活、名次等行為換取子彈幣，用於商店買武器。
+
+# ============= 規格 =============
+data_store:
+  store_name: PlayerCurrency_v1
+  key: tostring(player.UserId)
+  value: number  # coin balance (integer)
+  studio_caveat: |
+    Studio playtest 需要 Game Settings → Security → Enable Studio Access to
+    API Services 啟用。否則 GetAsync/SetAsync 失敗，所有玩家從 0 coins 起
+    （warning 不 fatal）。
+
+economy_config_source: GameConfig.ECONOMY
+rewards:
+  MatchComplete: 50
+  SurvivePerMin: 20
+  KillPatrolNPC: 10
+  KillArmoredNPC: 25
+  KillEliteNPC: 60
+  KillPlayer: 100
+  AssistPlayer: 40
+  PlacementTop5: 150
+  PlacementTop3: 250
+  PlacementWin: 500
+  FirstWinDaily: 300  # bonus on top of PlacementWin
+
+per_match_caps:
+  NpcKills: 300        # 累計所有 NPC kill rewards
+  Survival: 200
+  PlayerKills: 600
+  MatchTotal: 1500     # hard cap 不分類別
+
+api:
+  getCoins: "(player) -> number"
+  addCoins: |
+    (player, amount, category?) -> actualAmount
+    Clamps by per-category cap (NpcKills/Survival/PlayerKills) AND total match cap.
+    Returns 0 if entirely capped, or partial amount if cap hit mid-way.
+  spend: "(player, amount) -> bool — for shop purchases; false on insufficient balance"
+  resetMatchCaps: "(player) — call from MatchManager.startMatch to clear per-match counters"
+  addDailyReward: |
+    (player, amount, reason) -> int
+    Bypasses per-match caps. Used by DailyQuestService.tryClaim only.
+
+remote_events:
+  CurrencyUpdate: "server → client; broadcasts new balance whenever coins change"
+  GetCurrency: "RemoteFunction; client polls initial balance on join (avoids subscribe race)"
+
+persistence_strategy:
+  save_trigger: PlayerRemoving + game.BindToClose
+  no_save_per_spend: |
+    Spend updates in-memory only; persistence batched at session end to avoid
+    DataStore throttling. Crash mid-session = player keeps previous session's earnings.
+  bindToClose_budget: ~30s synchronous
+
+artifacts:
+  - src/ServerScriptService/CurrencyService.lua  (167 行)
+  - src/ReplicatedStorage/GameConfig.lua  (ECONOMY block)
+  - src/ServerScriptService/GameEventsBootstrap.lua  (CurrencyUpdate + GetCurrency events)
+  - src/ServerScriptService/MatchManager.lua  (awardCoins helper + reward firing)
+
+success_criteria:
+  - "玩家 coins 跨 session 持久化（離開→重進，餘額還在）"
+  - "MatchTotal cap 1500 在單場 match 內守住，超過拒收"
+  - "spend() 拒絕餘額不足的購買，true 才扣"
+  - "Studio 沒開 API Services 時 graceful（warning 不 crash，玩家從 0 起）"
+  - "BindToClose 收尾時所有 active player 都存檔"
+
+recovery:
+  - "玩家 coins 異常重置 → 檢查 Studio API Services 是否啟用"
+  - "DataStore throttling → save 批次化已實作（PlayerRemoving / BindToClose）"
+  - "category 字串拼錯 → category 不在 caps[] 時無 cap 限制（仍受 MatchTotal）"
+  - "_G.CurrencyService nil → 確認 CurrencyService.lua 在 MatchManager 之前 loaded"
+
+# ============= 與其他系統的依賴 =============
+dependencies:
+  upstream: []
+  downstream:
+    - ShopService (calls CurrencyService.spend)
+    - DailyQuestService (calls CurrencyService.addDailyReward)
+    - MatchManager (calls CurrencyService.addCoins via awardCoins helper)

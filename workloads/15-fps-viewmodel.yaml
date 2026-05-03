@@ -1,0 +1,126 @@
+name: FPSViewmodel
+owner: claude-code
+priority: P1-polish
+status: ✅ DONE (Sprint 8 — commits 3db2349, 78c4b9f, ab5a601, Sprint 8a 補檔)
+backfill_receipt: receipts/sprint-8-shop-economy-fps.md
+backfill_note: |
+  此 contract 為 Sprint 8a 衛生補課產出。實際實作分散在 main 多個 commits：
+  - 3db2349 fix(camera+timer): FPS viewmodel + crosshair-aligned aim + clear PvP timer
+  - 78c4b9f fix(camera): spectator camera on death + IK survives jump + crosshair GuiInset
+  - ab5a601 fix(camera+lighting): right-click works in third-person + brighten arena
+  - 9829d65 fix(hud): hide crosshair in lobby + spectator + while menus are open
+  CEO 原始要求：「武器做好是什麼意思？要看到武器外型」(Sprint 7) 延伸到第一人稱
+  視角體驗需求。
+
+# ============= 系統定位 =============
+purpose: |
+  比賽中第一人稱（FPS）視角體驗：
+  1. CameraController 鎖第一人稱 + 鎖定鼠標到中心（PvE/PvPWarning/PvP）；
+     大廳 / 觀戰時釋放回三人稱 + 自由鼠標。
+  2. ViewmodelController 強制手臂可見（覆蓋 LockFirstPerson 預設隱藏）+
+     LeftHand IK 把左手 pin 到武器 Handle.LeftGrip attachment（雙手持槍）。
+  3. crosshair-aligned aim：raycast 從 viewport center 出，bullet 對齊準心
+     而非 muzzle 方向（修正 #5/6/7）。
+
+# ============= 規格 =============
+camera_states:
+  in_arena_no_ui:
+    CameraMode: LockFirstPerson
+    MouseBehavior: LockCenter
+    MouseIcon: hidden
+    Crosshair: visible
+  lobby_or_match_end:
+    CameraMode: Classic
+    MouseBehavior: Default
+    MouseIcon: visible
+    Crosshair: hidden
+  shop_or_quest_ui_open:
+    Override: MouseBehavior=Default + MouseIcon=visible
+    rationale: "LockCenter swallows clicks — 沒這個 override 玩家點不到 UI 按鈕"
+  local_eliminated:
+    CameraMode: Classic
+    rationale: "被淘汰玩家用三人稱觀戰；別人比賽繼續，不能用 phase 判斷"
+
+interactive_uis_set:
+  - ShopUI
+  - DailyQuestUI
+
+mouse_release_enforcement:
+  rationale: |
+    Roblox CameraScript 從 LockFirstPerson 過渡時會延續 LockCenter 數 frames，
+    不強制 Default 會把鼠標重新搶回 LockCenter。
+  implementation: |
+    退出 first-person 時設 releaseEnforceUntil = tick() + 1.0；
+    RenderStepped 在這 1 秒內持續強制 Default。
+  three_branches:
+    - shouldLock: enforce LockCenter (CameraScript 會 release 所以要 clamp)
+    - ui_open_or_releasing: enforce Default (CameraScript 會 creep 回 LockCenter)
+    - else: 不 enforce，讓 CameraScript 自管（right-click drag、click-to-move）
+
+viewmodel_arms:
+  rationale: "LockFirstPerson 設 LocalTransparencyModifier=1 隱藏所有 body parts，玩家看不到自己的手"
+  fix: "RenderStepped 強制 6 個 arm parts (Left/Right Upper/Lower/Hand) LocalTransparencyModifier=0"
+
+left_hand_ik:
+  trigger: "Tool 加入 character 時 (ChildAdded)"
+  setup_delay: "task.wait(0.1) 讓 server 的 grip weld 安頓再解析 attachment"
+  ik_config:
+    Type: Position
+    ChainRoot: LeftUpperArm
+    EndEffector: LeftHand
+    Target: tool.Handle.LeftGrip (Attachment)
+    Weight: 1.0
+    Priority: 1000  # 高 priority 防 jump animation override (#12)
+  teardown: "Tool removed 或新 Tool equipped → 重建 IKControl"
+  exempt_weapons: |
+    單手武器（Pistol/Knife）武器 mesh 不需要 LeftGrip attachment，IK 自動 skip。
+
+crosshair_aligned_aim:
+  problem: |
+    Sprint 7 從 Muzzle.WorldPosition 發 raycast，但玩家瞄準點是螢幕中心 crosshair。
+    Muzzle 在槍身右側，bullet 與 crosshair 不同步 (#5/6/7)。
+  fix: |
+    WeaponClient 改 raycast origin = workspace.CurrentCamera.CFrame.Position；
+    direction = (worldPointAtCrosshair - origin).Unit
+    server-side 同步調整。
+
+artifacts:
+  - src/StarterPlayerScripts/CameraController.lua  (130 行 — 主控)
+  - src/StarterPlayerScripts/ViewmodelController.lua  (94 行 — arms 可見 + LeftHand IK)
+  - src/StarterPlayerScripts/WeaponClient.lua  (修正 fire origin 至 camera center)
+  - src/StarterPlayerScripts/HUDController.lua  (crosshair ScreenGui FinalStrikeCrosshair)
+  - src/ServerScriptService/MatchManager.lua  (FireWeapon handler 接收 client crosshair-aligned direction)
+
+success_criteria:
+  - "比賽中鎖第一人稱，玩家看到自己的手 + 武器"
+  - "雙手武器（Rifle/SMG/Sniper/Shotgun）左手 IK 抓在 LeftGrip"
+  - "Pistol/Knife 不啟動 IK（沒 LeftGrip attachment）"
+  - "Tool 切換時 IK 立即重建，不殘留前一把武器的 IK"
+  - "Jump 時 IK Priority 1000 蓋住 jump animation 的 LeftArm 軌道（#12）"
+  - "Shop / Daily Quest UI 開啟時，鼠標釋放可點 UI 按鈕"
+  - "UI 關閉後恢復 LockCenter（在比賽中）"
+  - "被淘汰玩家切回三人稱觀戰（#11）"
+  - "Bullet 從螢幕中心發射對齊 crosshair（不是從 muzzle 偏右）"
+  - "大廳 / Match End 階段釋放鼠標"
+
+recovery:
+  - "鼠標卡 LockCenter 點不到 UI → releaseEnforceUntil 機制 / interactive_uis_set 是否註冊"
+  - "手不見 → ViewmodelController RenderStepped LocalTransparencyModifier 強制"
+  - "雙手沒 IK → tool.Handle.LeftGrip attachment 是否存在；task.wait(0.1) 延遲足夠"
+  - "Jump 時手脫離武器 → IK Priority 是否 1000"
+  - "Bullet 不對齊 crosshair → WeaponClient raycast origin 是否改成 camera center"
+
+# ============= 已知限制 / Sprint 8b+ 候選 =============
+known_limitations:
+  - "muzzle flash 仍 client-only（Sprint 7 lesson）— 跨玩家可見要 server-side flash event"
+  - "Crosshair 是 4-segment open-center（commit d054043 CEO spec），未對應稀有度顏色"
+
+# ============= 依賴 =============
+dependencies:
+  upstream:
+    - WeaponMeshes (LeftGrip attachment on Handle)
+  downstream: []
+  events_observed:
+    - PhaseChanged
+    - PlayerEliminated
+    - GUI Enabled changes (ShopUI / DailyQuestUI)

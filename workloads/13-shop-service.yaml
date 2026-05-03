@@ -1,0 +1,92 @@
+name: ShopService
+owner: claude-code
+priority: P1-economy
+status: ✅ DONE (Sprint 8 — commit 5928547 + 18db315，Sprint 8a 補檔)
+backfill_receipt: receipts/sprint-8-shop-economy-fps.md
+backfill_note: |
+  此 contract 為 Sprint 8a 衛生補課產出。實際實作已於 main commit 5928547
+  + 18db315 完成。
+
+# ============= 系統定位 =============
+purpose: |
+  30 武器商店 + 持久化武器擁有狀態 + 主武器選擇。
+  玩家用 CurrencyService.spend 花 coins 買武器，買到的武器跨 session 保留，
+  比賽開始時 server 把 primary weapon attach 到 character。
+
+# ============= 規格 =============
+data_stores:
+  ownership:
+    name: PlayerOwnedWeapons_v1
+    key: tostring(player.UserId)
+    value: array of weapon names (strings)
+  primary:
+    name: PlayerPrimaryWeapon_v1
+    key: tostring(player.UserId)
+    value: weapon name (string)
+    rationale: "存獨立 key — 萬一 primary 損毀不會丟失整批 ownership"
+
+starter_weapons_source: GameConfig.STARTER_WEAPONS
+starter_weapons_default: ["Viper Mk1", "Fang Scout"]
+starter_weapons_behavior: |
+  Loaded 時自動授予（不存進 DataStore）— 之後若 GameConfig.STARTER_WEAPONS
+  增加新項目，老玩家也自動拿到。
+
+weapon_validation: |
+  Load 時檢查每把武器名是否仍存在於 GameConfig.WEAPONS。
+  若 patch 移除某把武器，玩家擁有的該武器在 load 時被忽略（不寫回 store）。
+
+api:
+  getOwned: "(player) -> set[weaponName] = true"
+  isOwned: "(player, weaponName) -> bool"
+  getPrimary: "(player) -> weaponName"
+  setPrimary: |
+    (player, weaponName) -> success: bool, reason: string
+    Validates owned + exists. Reason: "ok" / "notowned" / "unknown"
+  tryBuy: |
+    (player, weaponName) -> success: bool, reason: string
+    Reason: "ok" / "unknown" / "owned" / "broke" / "noservice"
+    Spends via CurrencyService.spend, granted on success.
+
+remote_events:
+  BuyWeapon: "client → server; weaponName"
+  BuyWeaponResult: "server → client; (success, reason, weaponName)"
+  EquipPrimaryWeapon: "client → server; weaponName (silent on fail — UI gates it)"
+  PrimaryWeaponUpdate: "server → client; broadcasts new primary on change"
+  OwnedWeaponsUpdate: "server → client; broadcasts sorted list on change"
+  GetOwnedWeapons: "RemoteFunction; client polls initial state on join"
+  GetPrimaryWeapon: "RemoteFunction; client polls initial state on join"
+
+persistence_strategy:
+  save_trigger: PlayerRemoving + game.BindToClose
+  rationale: "Buys update in-memory; batched save avoids DataStore throttling"
+
+artifacts:
+  - src/ServerScriptService/ShopService.lua  (199 行)
+  - src/StarterPlayerScripts/ShopController.lua  (362 行 — UI + buy/equip flow)
+  - src/ReplicatedStorage/GameConfig.lua  (WEAPONS 30 把 + RARITY + STARTER_WEAPONS)
+  - src/ServerScriptService/GameEventsBootstrap.lua  (Buy* + Equip* + GetOwnedWeapons + GetPrimaryWeapon events)
+  - src/ServerScriptService/MatchManager.lua  (startMatch 用 ShopService.getPrimary)
+
+success_criteria:
+  - "30 把武器全部可在 ShopController UI 中看到，含 Price / Rarity / DPS"
+  - "starter weapons (Viper Mk1, Fang Scout) 新玩家初始就擁有"
+  - "tryBuy 成功時扣 coins + 加入 owned set + push update"
+  - "已擁有的武器 tryBuy 回 'owned' 不重複扣費"
+  - "餘額不足時 tryBuy 回 'broke' 不扣不解鎖"
+  - "primary weapon 跨 session 保留（重進遊戲後 EquipPrimaryWeapon 結果還在）"
+  - "MatchManager.startMatch 把 primary 套到 character"
+
+recovery:
+  - "BuyWeapon 沒反應 → 檢查 BuyWeapon RemoteEvent 在 GameEventsBootstrap 建立"
+  - "primary 重生後消失 → 確認 attachWeapon 在 CharacterAdded re-bind hook 觸發"
+  - "DataStore throttling → save 批次化已實作"
+  - "patch 移除武器 → load 時自動 skip 該武器，不 crash"
+
+# ============= 依賴 =============
+dependencies:
+  upstream:
+    - CurrencyService (spend)
+    - GameConfig.WEAPONS / STARTER_WEAPONS
+  downstream:
+    - MatchManager (getPrimary on startMatch)
+    - WeaponMeshes (build weapon Tool by name)
