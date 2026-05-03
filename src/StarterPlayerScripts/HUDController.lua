@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
 local events = ReplicatedStorage:WaitForChild("GameEvents")
+local GameConfig = require(ReplicatedStorage:WaitForChild("GameConfig"))
 
 -- ====== CREATE HUD ======
 -- Main HUD ScreenGui keeps the default IgnoreGuiInset=false so existing widgets
@@ -49,7 +50,7 @@ local hpText = Instance.new("TextLabel")
 hpText.Name = "HPText"
 hpText.Size = UDim2.new(1, 0, 1, 0)
 hpText.BackgroundTransparency = 1
-hpText.Text = "100 / 100"
+hpText.Text = GameConfig.MAX_HP .. " / " .. GameConfig.MAX_HP  -- Sprint 8b: 200 HP
 hpText.TextColor3 = Color3.fromRGB(255, 255, 255)
 hpText.TextScaled = true
 hpText.Font = Enum.Font.GothamBold
