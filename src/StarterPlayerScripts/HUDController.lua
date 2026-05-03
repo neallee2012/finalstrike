@@ -266,20 +266,40 @@ crosshairGui.ResetOnSpawn = false
 crosshairGui.IgnoreGuiInset = true
 crosshairGui.Parent = player.PlayerGui
 
-local crosshair = Instance.new("Frame")
-crosshair.Name = "Crosshair"
-crosshair.Size = UDim2.new(0, 2, 0, 20)
-crosshair.Position = UDim2.new(0.5, -1, 0.5, -10)
-crosshair.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-crosshair.BorderSizePixel = 0
-crosshair.Parent = crosshairGui
+-- CEO-spec 4-segment open-center reticle: top/bottom/left/right white lines
+-- with a center gap. Black UIStroke outline keeps the reticle visible against
+-- bright backgrounds (sky, neon lights). Matches the reference image — gap
+-- around center, subtle black border.
+local LINE_LENGTH = 14    -- length of each arm
+local LINE_THICKNESS = 2
+local CENTER_GAP = 6      -- pixels from screen center to inner end of each arm
 
-local crosshairH = Instance.new("Frame")
-crosshairH.Size = UDim2.new(0, 20, 0, 2)
-crosshairH.Position = UDim2.new(0.5, -10, 0.5, -1)
-crosshairH.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-crosshairH.BorderSizePixel = 0
-crosshairH.Parent = crosshairGui
+local function makeReticleLine(name, size, position)
+	local line = Instance.new("Frame")
+	line.Name = name
+	line.Size = size
+	line.Position = position
+	line.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	line.BorderSizePixel = 0
+	line.Parent = crosshairGui
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(0, 0, 0)
+	stroke.Thickness = 1
+	stroke.Parent = line
+end
+
+makeReticleLine("ReticleTop",
+	UDim2.new(0, LINE_THICKNESS, 0, LINE_LENGTH),
+	UDim2.new(0.5, -math.floor(LINE_THICKNESS/2), 0.5, -CENTER_GAP - LINE_LENGTH))
+makeReticleLine("ReticleBottom",
+	UDim2.new(0, LINE_THICKNESS, 0, LINE_LENGTH),
+	UDim2.new(0.5, -math.floor(LINE_THICKNESS/2), 0.5, CENTER_GAP))
+makeReticleLine("ReticleLeft",
+	UDim2.new(0, LINE_LENGTH, 0, LINE_THICKNESS),
+	UDim2.new(0.5, -CENTER_GAP - LINE_LENGTH, 0.5, -math.floor(LINE_THICKNESS/2)))
+makeReticleLine("ReticleRight",
+	UDim2.new(0, LINE_LENGTH, 0, LINE_THICKNESS),
+	UDim2.new(0.5, CENTER_GAP, 0.5, -math.floor(LINE_THICKNESS/2)))
 
 -- ====== EVENT HANDLERS ======
 events:WaitForChild("HealthUpdate").OnClientEvent:Connect(function(hp, maxHP)
