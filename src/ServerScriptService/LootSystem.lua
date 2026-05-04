@@ -20,10 +20,17 @@ local function createPickup(lootType, position)
 	part.Position = position + Vector3.new(0, 2, 0)
 	part:SetAttribute("LootType", lootType)
 
+	-- Sprint 8b: 4-tier medkit colors (light → standard → deep green → off-white for full)
 	if lootType == "Ammo" then
 		part.Color = Color3.fromRGB(255, 200, 50)
+	elseif lootType == "MedkitSmall" then
+		part.Color = Color3.fromRGB(120, 255, 150)  -- light green (50 HP)
 	elseif lootType == "Medkit" then
-		part.Color = Color3.fromRGB(50, 255, 100)
+		part.Color = Color3.fromRGB(50, 255, 100)   -- standard green (100 HP)
+	elseif lootType == "MedkitLarge" then
+		part.Color = Color3.fromRGB(20, 200, 80)    -- deep green (150 HP)
+	elseif lootType == "MedkitFull" then
+		part.Color = Color3.fromRGB(255, 255, 200)  -- off-white (full restore, 200 HP)
 	elseif lootType == "Coin" then
 		part.Color = Color3.fromRGB(255, 215, 0)
 	end
@@ -60,8 +67,13 @@ local function createPickup(lootType, position)
 		if lootType == "Ammo" then
 			data.Ammo = data.Ammo + GameConfig.LOOT.Ammo.Amount
 			events.AmmoUpdate:FireClient(player, data.Ammo, 30)
-		elseif lootType == "Medkit" then
-			mm.healPlayer(player, GameConfig.LOOT.Medkit.Heal)
+		elseif lootType == "MedkitSmall" or lootType == "Medkit"
+		    or lootType == "MedkitLarge" or lootType == "MedkitFull" then
+			-- Sprint 8b: 4-tier medkit; heal amount lookup from GameConfig.LOOT[tier].Heal
+			local entry = GameConfig.LOOT[lootType]
+			if entry and entry.Heal then
+				mm.healPlayer(player, entry.Heal)
+			end
 		elseif lootType == "Coin" then
 			data.Coins = data.Coins + GameConfig.LOOT.Coin.Amount
 		end

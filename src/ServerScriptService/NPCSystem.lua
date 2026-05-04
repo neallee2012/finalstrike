@@ -226,16 +226,20 @@ local function dropLoot(npcModel)
 			loot.Shape = Enum.PartType.Ball
 			loot:SetAttribute("LootType", lootType)
 
-			-- Color by type
+			-- Sprint 8b: 4-tier medkit colors match LootSystem.createPickup
+			loot.Material = Enum.Material.Neon
 			if lootType == "Ammo" then
 				loot.Color = Color3.fromRGB(255, 200, 50)
-				loot.Material = Enum.Material.Neon
+			elseif lootType == "MedkitSmall" then
+				loot.Color = Color3.fromRGB(120, 255, 150)
 			elseif lootType == "Medkit" then
 				loot.Color = Color3.fromRGB(50, 255, 100)
-				loot.Material = Enum.Material.Neon
+			elseif lootType == "MedkitLarge" then
+				loot.Color = Color3.fromRGB(20, 200, 80)
+			elseif lootType == "MedkitFull" then
+				loot.Color = Color3.fromRGB(255, 255, 200)
 			elseif lootType == "Coin" then
 				loot.Color = Color3.fromRGB(255, 215, 0)
-				loot.Material = Enum.Material.Neon
 			end
 
 			-- Glow
@@ -260,8 +264,13 @@ local function dropLoot(npcModel)
 				if lootType == "Ammo" then
 					data.Ammo = data.Ammo + GameConfig.LOOT.Ammo.Amount
 					events.AmmoUpdate:FireClient(player, data.Ammo, 30)
-				elseif lootType == "Medkit" then
-					mm.healPlayer(player, GameConfig.LOOT.Medkit.Heal)
+				elseif lootType == "MedkitSmall" or lootType == "Medkit"
+				    or lootType == "MedkitLarge" or lootType == "MedkitFull" then
+					-- Sprint 8b: 4-tier medkit; heal amount lookup
+					local entry = GameConfig.LOOT[lootType]
+					if entry and entry.Heal then
+						mm.healPlayer(player, entry.Heal)
+					end
 				elseif lootType == "Coin" then
 					data.Coins = data.Coins + GameConfig.LOOT.Coin.Amount
 				end

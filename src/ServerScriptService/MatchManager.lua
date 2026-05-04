@@ -522,10 +522,19 @@ events:WaitForChild("FireWeapon").OnServerEvent:Connect(function(player, origin,
 			local hitHumanoid = hitChar and hitChar:FindFirstChildOfClass("Humanoid")
 
 			if hitHumanoid then
+				-- Sprint 8b D1: Sniper Type only — hitting Head part applies headshot multiplier.
+				-- Other Types (Pistol/SMG/Rifle/Shotgun/Knife/Minigun) deal flat Damage on Head hit.
+				-- Strict "Head part only" — NPC hat/hood/helmet accessories don't count (deflected).
+				local damage = config.Damage
+				local isHeadshot = hitPart.Name == "Head"
+				if config.Type == "Sniper" and isHeadshot then
+					damage = damage * GameConfig.HEADSHOT_MULTIPLIER
+				end
+
 				-- Check if it's a player
 				local hitPlayer = Players:GetPlayerFromCharacter(hitChar)
 				if hitPlayer then
-					MatchManager.damagePlayer(hitPlayer, config.Damage, player)
+					MatchManager.damagePlayer(hitPlayer, damage, player)
 				else
 					-- It's an NPC - let NPCSystem handle death via HP attribute listener.
 					-- Stamp LastAttackerId so NPCSystem.dropLoot can credit the kill bonus
@@ -533,11 +542,11 @@ events:WaitForChild("FireWeapon").OnServerEvent:Connect(function(player, origin,
 					-- can't be stored in attributes.
 					local npcHP = hitChar:GetAttribute("HP")
 					if npcHP then
-						npcHP = npcHP - config.Damage
+						npcHP = npcHP - damage
 						hitChar:SetAttribute("HP", npcHP)
 						hitChar:SetAttribute("LastAttackerId", player.UserId)
 						-- Tell clients to flash the NPC and float a damage number
-						events.NPCDamaged:FireAllClients(hitChar, config.Damage, result.Position)
+						events.NPCDamaged:FireAllClients(hitChar, damage, result.Position)
 					end
 				end
 			end

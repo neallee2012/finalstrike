@@ -1,7 +1,8 @@
 name: LootSystem
 owner: claude-code
 priority: P1-polish
-status: ✅ DONE (Sprint 3) | 🔄 REBALANCE PLANNED (Sprint 8 — 4 階 medkit)
+status: ✅ DONE (Sprint 3 + Sprint 8b 4-tier medkit, 2026-05-03)
+sprint_8b_receipt: receipts/sprint-8b-200hp-rebalance.md
 
 # ============= Sprint 8 計劃中的修改 =============
 # 詳見 proposals/sprint-8-200hp-balance.md §4.4
