@@ -93,6 +93,36 @@ for _, name in ipairs({"Wraith Scout", "Wraith Hunter", "Wraith Frost", "Wraith 
 end
 
 -- ============================================================
+-- 3.5. 30-weapon Price values (Sprint 9 Option A — CEO 2026-05-04)
+-- Tier discounts: Common 0% / Uncommon 0% / Rare -5% / Epic -10% / Legendary -20% / Demon -25%
+-- See proposals/demon-shop-price-realignment.md.
+-- ============================================================
+local priceExpect = {
+	-- Common (5) — 0% (unchanged)
+	["Viper Mk1"]=300, ["Viper SD"]=350, ["Fang Scout"]=450,
+	["Thunder Stub"]=550, ["Thunder Cut"]=650,
+	-- Uncommon (5) — 0% (unchanged)
+	["Stinger Mk2"]=1200, ["Stinger Tac"]=1350, ["Phantom Ranger"]=1500,
+	["Wraith Scout"]=1650, ["Stinger Burst"]=1800,
+	-- Rare (5) — -5%
+	["Reaver-X"]=2850, ["Phantom Night"]=3150, ["Thunder Guard"]=3400,
+	["Wraith Hunter"]=3800, ["Thunder Triple"]=4275,
+	-- Epic (6) — -10%
+	["Stinger Storm"]=6750, ["Phantom Apex"]=7200, ["Wraith Frost"]=7650,
+	["Phantom Whisper"]=8100, ["Thunder Royal"]=8800, ["Viper Left"]=8800,
+	-- Legendary (5) — -20%
+	["Viper Aurum"]=12800, ["Phantom Finale"]=14400, ["Wraith Apex"]=16000,
+	["Thunder Crown"]=17600, ["Hailstorm"]=20000,
+	-- Demon (4) — -25%
+	["Fang Demon"]=26250, ["Phantom Hellfire"]=31500, ["Wraith Abyss"]=36000,
+	["Thunder Bloodmoon"]=41250,
+}
+for name, expected in pairs(priceExpect) do
+	local cfg = GameConfig.WEAPONS[name]
+	check("WEAPONS." .. name .. ".Price", cfg and cfg.Price, expected)
+end
+
+-- ============================================================
 -- 4. NPC HP / Damage ×2 + 4-tier loot drop tables
 -- ============================================================
 check("ENEMIES.Patrol.HP",      GameConfig.ENEMIES.Patrol.HP,      120)
