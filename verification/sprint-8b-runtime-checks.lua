@@ -140,7 +140,8 @@ for _, m in ipairs(workspace:GetChildren()) do
 	end
 end
 
-if (npcsByType.Patrol + npcsByType.Armored + npcsByType.Elite) == 0 then
+local hasNpcs = (npcsByType.Patrol + npcsByType.Armored + npcsByType.Elite) > 0
+if not hasNpcs then
 	print("[VERIFY SKIP] No NPCs in workspace — run during PvE phase to verify spawn pipeline")
 else
 	-- Sprint 5 layout: 4 Patrol / 3 Armored / 2 Elite
@@ -155,6 +156,7 @@ end
 -- ============================================================
 -- 7. Player HUD initial text (only meaningful for local player after init)
 -- ============================================================
+local hadHud = false
 local lp = Players.LocalPlayer
 if lp then
 	local pg = lp:FindFirstChild("PlayerGui")
@@ -162,6 +164,7 @@ if lp then
 	local hpText = hud and hud:FindFirstChild("HPText", true)
 	if hpText then
 		check("HUD HPText format reflects MAX_HP", hpText.Text, "200 / 200")
+		hadHud = true
 	else
 		print("[VERIFY SKIP] HUD HPText not yet built")
 	end
@@ -182,4 +185,14 @@ end
 -- Structured return for programmatic callers (e.g. MCP execute_luau).
 -- For Studio command-bar use, the return value is ignored — the print/warn
 -- output is the human-readable result.
-return { passed = pass, failed = fail, failures = failures }
+--
+-- hasNpcs / hadHud flags let callers explain why `passed` count varied —
+-- e.g. (passed=63, hadHud=true, hasNpcs=false) means script was run in
+-- lobby (62 static + 1 HUD), no drift, just no NPC sample.
+return {
+	passed = pass,
+	failed = fail,
+	failures = failures,
+	hasNpcs = hasNpcs,
+	hadHud = hadHud,
+}
