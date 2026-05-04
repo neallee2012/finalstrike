@@ -10,29 +10,60 @@ Purpose: Close the 5 integration tests that `verification/sprint-8b-runtime-chec
 3. 任何 expected 不符記錄到 §"Issues found" 段
 4. 跑完更新 `receipts/sprint-8b-studio-verify.md` §"Deferred" 區塊狀態，並 commit 本 checklist 結果
 
-## Setup（共用，一次做完）
+## Setup — Two-phase playtest
+
+> ⚠️ **必讀**：`MatchManager.initPlayerData()` 在 match start 時 snapshot `playerData[player].Weapon`，之後 `FireWeapon` 拒絕任何 `weaponName ~= data.Weapon`。中途買武器或按 EquipPrimaryWeapon **不會改 server 的 data.Weapon**，要等下一場 match init 才生效。
+>
+> 因此 Tests 分 2 個 phase 跑：
+> - **Phase 1**（用 starter Viper Mk1）：Test 2 + Test 4
+> - **Phase 2**（restart match 用 Wraith Scout）：Test 1 + Test 3 + Test 5
+
+### 共同 setup（一次）
 
 - [ ] **Open Studio** at the Final Strike place
 - [ ] **Press Play** — 進大廳
-- [ ] **走到 StartMatchPad** 觸發比賽
-- [ ] **等到 PvE 階段**（HUD 顯示 "PVE" + 倒數 timer）
-- [ ] **HUD 確認 "200 / 200"** （最初 spawn）
-- [ ] **F9 開 Output 視窗** — 等等要看 server 端的 `[damagePlayer]` log 與 client 端的 `[Reward]` log
-
-> 起手只有 starter weapons（Viper Mk1 + Fang Scout）。Wraith Scout 1650 子彈幣，新玩家 0 coins → 需要先打幾個 NPC 賺。**或捷徑**：playtest 中跳過 lobby 經濟 → 在 Command Bar 跑：
-> ```lua
-> if _G.CurrencyService then _G.CurrencyService.addCoins(game.Players:GetPlayers()[1], 5000, nil) end
-> ```
-> 直接給 5K coins 夠買 Wraith Scout + 還有 medkit 餘裕。
+- [ ] **F9 開 Output 視窗** — 等等要看 server 端的 `[damagePlayer]` log 與 NPCDamaged 數字
 
 ---
 
-## Test 1: Wraith Scout body 120 / headshot 240（Sniper headshot 正面驗證）
+### Phase 1: 用 starter Viper Mk1 跑 Test 2 + Test 4
 
-**Setup**:
-- [ ] Open shop UI (B 鍵)
-- [ ] 買 Wraith Scout（1650 coins）並 set as primary
-- [ ] 等比賽 respawn / re-equip 拿到 Wraith Scout
+- [ ] 確認手上拿 **Viper Mk1**（player 預設 STARTER_WEAPONS[1]）
+- [ ] **走到 StartMatchPad** 觸發比賽
+- [ ] **等到 PvE 階段**，HUD "200 / 200"
+- [ ] **跑 Test 2**（Pistol head hit ≠ Sniper bonus）— 見 §Test 2
+- [ ] **跑 Test 4**（200 HP drain rate）— 見 §Test 4
+- [ ] Test 2 + 4 完成後，**讓自己被 NPC 殺死**（或等比賽結束）回大廳
+
+---
+
+### Phase 2: 大廳買 Wraith Scout，restart match 跑 Test 1 + 3 + 5
+
+- [ ] 回到大廳（match end → lobby teleport）
+- [ ] **Command Bar 跑 coin grant**（bypass MatchTotal cap，必須用 addDailyReward 而非 addCoins）：
+  ```lua
+  -- addDailyReward 跳過 GameConfig.ECONOMY.MatchCaps.MatchTotal = 1500 限制
+  -- 用 addCoins(_, _, nil) 會只發 1500 coins，買不起 1650 的 Wraith Scout
+  if _G.CurrencyService then
+      _G.CurrencyService.addDailyReward(game.Players:GetPlayers()[1], 5000, "playtest setup")
+  end
+  ```
+  HUD 子彈幣顯示應跳到 **5000+**
+- [ ] **B 鍵開 Shop UI**
+- [ ] **買 Wraith Scout**（1650 coins）
+- [ ] **設 Wraith Scout 為 primary**（shop UI 按 Equip）→ 觸發 PrimaryWeaponUpdate
+- [ ] **走到 StartMatchPad 重新觸發比賽** — `initPlayerData` 會 snapshot Wraith Scout 為 `data.Weapon`
+- [ ] **等到 PvE 階段**，**確認手上拿 Wraith Scout**（不是 Viper Mk1）
+- [ ] **跑 Test 1**（Wraith body / head）— 見 §Test 1
+- [ ] **跑 Test 3**（NPC drop visual，殺 Elite）— 見 §Test 3
+- [ ] **跑 Test 5**（NPC accessory edge）— 見 §Test 5
+
+---
+
+## Test 1: Wraith Scout body 120 / headshot 240（Sniper headshot 正面驗證） — Phase 2
+
+**Setup**: 已在 Phase 2 setup 買好 Wraith Scout、set primary、re-start match → init snapshot 用 Wraith Scout。
+- [ ] 確認手上拿的是 **Wraith Scout**（不是 Viper Mk1）
 - [ ] 找一隻 Patrol NPC（120 HP）站著沒動的目標
 
 **Action A — body shot**:
@@ -43,7 +74,7 @@ Purpose: Close the 5 integration tests that `verification/sprint-8b-runtime-chec
 - [ ] Damage = **120**（NPC HP 120 → 0，秒殺；console 印 NPCDamaged 數字 = 120）
 
 **Action B — headshot**:
-- [ ] Spawn 新一場比賽（或等下一波 NPC）
+- [ ] 等下一隻活的 Patrol（剛剛 body shot 一發秒殺，要找新的）
 - [ ] 對 Patrol 的 **Head** 部位開 1 槍
 
 **Expected**:
@@ -53,9 +84,9 @@ Purpose: Close the 5 integration tests that `verification/sprint-8b-runtime-chec
 
 ---
 
-## Test 2: Pistol Head hit ≠ Sniper bonus（headshot 負面驗證）
+## Test 2: Pistol Head hit ≠ Sniper bonus（headshot 負面驗證） — Phase 1
 
-**Setup**：拿 starter Viper Mk1（30 dmg, Type=Pistol）
+**Setup**：Phase 1，玩家手上是 starter **Viper Mk1**（30 dmg, Type=Pistol）— 這是 init 預設 primary，data.Weapon=Viper Mk1，FireWeapon 接受。
 
 **Action**:
 - [ ] 對 Patrol 的 **Head** 部位開 1 槍
@@ -70,9 +101,9 @@ Purpose: Close the 5 integration tests that `verification/sprint-8b-runtime-chec
 
 ---
 
-## Test 3: 4-tier medkit visual color from NPC drop
+## Test 3: 4-tier medkit visual color from NPC drop — Phase 2
 
-**Setup**: 站在 Elite NPC 附近（500 HP、紅色發光、可能戴兜帽）
+**Setup**: Phase 2 中（Wraith Scout 為 primary）。站在 Elite NPC 附近（500 HP、紅色發光、可能戴兜帽）
 
 **Action**:
 - [ ] 用 Wraith Scout 連續打 Elite 直到死（500 HP / 120 body = 5 發 body，或 1 爆頭 + 2 body）
@@ -95,9 +126,9 @@ Purpose: Close the 5 integration tests that `verification/sprint-8b-runtime-chec
 
 ---
 
-## Test 4: 200 HP vs Patrol attack drain rate（NPC ×2 damage 驗證）
+## Test 4: 200 HP vs Patrol attack drain rate（NPC ×2 damage 驗證） — Phase 1
 
-**Setup**:
+**Setup**: Phase 1（Viper Mk1 starter）— Test 4 是純被動觀察 drain rate，武器無關。Phase 2 也可以但 Phase 1 順便做最有效率。
 - [ ] 走到一隻 Patrol NPC 攻擊範圍內（AttackRange = 6）
 - [ ] **不要躲也不要還手**，站樁讓 Patrol 攻擊
 - [ ] 計時器（手機 stopwatch 或 console 看時間）
@@ -115,9 +146,9 @@ Purpose: Close the 5 integration tests that `verification/sprint-8b-runtime-chec
 
 ---
 
-## Test 5: NPC accessory（cap/helmet/hood）head-hit edge case
+## Test 5: NPC accessory（cap/helmet/hood）head-hit edge case — Phase 2
 
-**Setup**: 拿 Wraith Scout
+**Setup**: Phase 2，玩家拿 Wraith Scout
 
 **Why test**：D1 設計只 hitPart.Name == "Head" 觸發爆頭。但 NPC 戴的 hat/cap/helmet/hood 是獨立的 Part 掛在 Head 上（NPCSystem.dressNPC），它們的 Name 不是 "Head" 所以不該觸發爆頭加成 — 視覺上「子彈打到頭盔被擋」。
 

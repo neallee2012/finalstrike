@@ -79,12 +79,12 @@ Sprint 8b (b) 公式收斂：
 
 **Pros**：
 - 不會讓老玩家（已存了 50K 想買 Demon）感受到通膨
-- 仍維持 Common→Demon ~57x 的價格 gap（從現在 117x 收斂）
+- Common→Demon avg 價差從 97.8x（舊世界 45000/460）收斂到 73.4x（新世界 33750/460），用 min/min 衡量則從 117x（35000/300）→ 87.5x（26250/300）— **付費 gap 仍明顯但不再誇張**
 - 保住「Demon = 最強」的視覺體感
 
 **Cons**：
-- Demon 仍比舊世界相對「貴」（每 DPS 17K vs 舊 15K，+13%）
-- 不完全解決 price-per-DPS 失衡
+- Demon 仍比舊世界相對「貴」：avg 33750 / DPS 1.9 = **17763 price per DPS unit vs 舊 15000，+18.4%**
+- 不完全解決 price-per-DPS 失衡（仍比 Common 460 高 39x）
 
 ### 選項 B：Pure proportional —— 嚴格按 DPS 倍率變化等比
 
@@ -189,7 +189,7 @@ Sprint 8b (b) 公式收斂：
 ## 7. 工程影響
 
 很小：
-- 改 `src/ReplicatedStorage/GameConfig.lua` 30 個 weapon Price 數值（25 個有變動）
+- 改 `src/ReplicatedStorage/GameConfig.lua` 30 個武器中的 **20 個** Price 值（Common 5 + Uncommon 5 = 10 把不變；Rare 5 + Epic 6 + Legendary 5 + Demon 4 = 20 把有變動）
 - ShopController UI 自動讀新值，不需改
 - 不影響 ShopService DataStore（因為買到的武器名稱不變，只是新買價格不同）
 
@@ -209,7 +209,7 @@ Sprint 8b (b) 公式收斂：
 ## 9. Sprint 9 implementation 計劃（如選 A）
 
 1. CEO 拍板選項 + 確認新 prices
-2. 改 GameConfig.lua 25 個 Price 值
+2. 改 GameConfig.lua **20 個** Price 值（Rare 5 + Epic 6 + Legendary 5 + Demon 4；Common/Uncommon 不動）
 3. Studio MCP playtest：開 ShopUI 確認新價格顯示
 4. 在 verification/sprint-8b-runtime-checks.lua 加 Price assertions（每把武器新價）
 5. 產出 receipts/sprint-9a-demon-price-realign.md
