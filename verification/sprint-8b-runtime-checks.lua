@@ -1,7 +1,10 @@
 --!strict
 -- verification/sprint-8b-runtime-checks.lua
 --
--- Reproducible Sprint 8b runtime verification.
+-- Reproducible balance-contract runtime verification.
+-- Originally a Sprint 8b artifact (filename kept for backref stability);
+-- now also covers Sprint 9a price realignment. Future sprints either
+-- extend this file or split into a sibling.
 --
 -- Usage:
 --   1. Open the Final Strike Studio place file
@@ -12,15 +15,26 @@
 --   5. Paste this entire file's contents and press Enter
 --   6. Check Output window for the [VERIFY] lines — every check should
 --      end with "OK" (green-ish prefix). Any "FAIL" prefix means runtime
---      drifted from the Sprint 8b design contract.
+--      drifted from a covered design contract.
 --
--- Equivalently, run just the assertion section via execute_luau over MCP
--- (see receipts/sprint-8b-studio-verify.md §"Static config verification").
+-- Equivalently, run via execute_luau over MCP (the script's `return`
+-- gives a structured `{ passed, failed, failures, hasNpcs, hadHud }`).
 --
 -- This script is read-only — it inspects state but doesn't mutate anything.
 --
--- Source of truth this checks against: proposals/30-weapon-dps-retune.md §9
--- + receipts/sprint-8b-200hp-rebalance.md.
+-- Sources of truth checked:
+--   - proposals/30-weapon-dps-retune.md §9 (Sprint 8b damage / config)
+--   - proposals/demon-shop-price-realignment.md §5 (Sprint 9a prices)
+--   - receipts/sprint-8b-200hp-rebalance.md
+--   - receipts/sprint-9a-demon-price-realign.md
+--
+-- Static check count = 92 (= 2 base + 6 rarity + 30 weapon damage + 5 sniper
+-- type + 6 enemies HP/dmg + 4 loot table + 3 weapon-drop-removed + 6 LOOT
+-- entries + 30 weapon prices). Conditional: +6 NPC (PvE only), +1 HUD.
+-- Possible totals by context:
+--   Lobby (no NPC, HUD ready):     92 + 0 + 1 = 93
+--   PvE (NPC + HUD):                92 + 6 + 1 = 99
+--   Server-only / no LocalPlayer:   92 (or 98 if NPC present)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
@@ -217,8 +231,9 @@ end
 -- output is the human-readable result.
 --
 -- hasNpcs / hadHud flags let callers explain why `passed` count varied —
--- e.g. (passed=63, hadHud=true, hasNpcs=false) means script was run in
--- lobby (62 static + 1 HUD), no drift, just no NPC sample.
+-- e.g. (passed=93, hadHud=true, hasNpcs=false) means script was run in
+-- lobby (92 static + 1 HUD), no drift, just no NPC sample. See header
+-- count table for all valid totals (92/93/98/99).
 return {
 	passed = pass,
 	failed = fail,
