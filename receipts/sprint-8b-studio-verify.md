@@ -114,24 +114,39 @@ These need a human play session — recommend doing 1 manual playtest before ann
 
 > Reviewer 觀察：本 receipt 內提到的 screenshot artifact 只 saved at MCP session（session-bound，不持久）。為了長期審計，把驗證步驟封裝成可重跑 script。
 
-**Method A — Studio command bar（人類審計）**：
+**Method A — Studio command bar（人類審計，看 print 輸出）**：
 1. 開啟 Final Strike `.rbxl`
 2. Press Play 進 PvE 階段（走到 StartMatchPad + 等 lobby 倒數 + spawn protection）
 3. Open Command Bar (View → Command Bar)
 4. Paste `verification/sprint-8b-runtime-checks.lua` 全部內容並 Enter
 5. 看 Output：所有 `[VERIFY OK]` = pass；`[VERIFY FAIL]` = 設計漂移；尾端印 `[VERIFY SUMMARY] X passed, Y failed`
 
-**Method B — MCP execute_luau（自動化審計）**：
-把 script body 餵進 `mcp__Roblox_Studio__execute_luau` 並要求 `return { passed, failed, failures }`。本 receipt 即如此驗證。
+**Method B — MCP `execute_luau`（自動化審計，看 structured return）**：
+把 script body 餵進 `mcp__Roblox_Studio__execute_luau`。Script 最後一行 `return { passed = pass, failed = fail, failures = failures }` 把結構化結果回傳給 caller — `failures[]` 內含每筆失敗的 `{label, expected, actual}` 方便程式對照修。Method B 與 Method A 看到的 print 輸出完全一致。
 
-**Last self-test result（2026-05-04, MCP execute_luau on `最後一擊` instance）**：
+### Check counts（依執行 context）
+
+Script 有 **62 個 static checks** + 條件式 runtime checks。實際 pass 數隨呼叫時的遊戲狀態變動：
+
+| Context | Static | Runtime NPC | HUD | **Total** |
+|---|---|---|---|---|
+| Lobby（無 NPC、HUD 已建）| 62 | 0 | 1 | **63** |
+| PvE（NPC + HUD 都有）| 62 | 6 | 1 | **69** |
+| Server-only / 沒 LocalPlayer | 62 | 0 or 6 | 0 | **62 / 68** |
+
+Static 62 = base (2) + Rarity (6) + Weapons Damage (30) + Sniper Type (5) + ENEMIES HP/Damage (6) + LootTable presence (4) + Weapon-drop-removed (3) + LOOT 6-entry (6).
+
+Skipped sections print `[VERIFY SKIP]` lines explaining why（無 NPC / 無 HUD / server-only），不計入 fail。
+
+### Last self-test result（2026-05-04, MCP execute_luau on `最後一擊` instance, PvE phase with HUD）
+
 ```
-{ passed = 65, failed = 0, failures = [] }
+{ passed = 69, failed = 0, failures = [], hasNpcs = true, hadHud = true }
 ```
 
-Coverage：base config (2) + Rarity (6) + 30 weapons Damage (30) + Sniper Type (5) + ENEMIES HP/Damage (6) + LootTable (5) + Weapon-drop-removed (1) + LOOT 4-tier (4) + Runtime spawn (6) — all under PvE phase.
+69/69 通過 = 62 static + 6 runtime NPC + 1 HUD = 完整覆蓋。
 
-Screenshot at `sprint_8b_pve_phase` (MCP session-bound) 仍可作為視覺輔助，但不再是審計主憑據 — 以 `verification/sprint-8b-runtime-checks.lua` 65 checks 為準。
+Screenshot at `sprint_8b_pve_phase` (MCP session-bound) 仍可作為視覺輔助，但不再是審計主憑據 — 以 `verification/sprint-8b-runtime-checks.lua` 的 structured return 為準。
 
 ## Next
 

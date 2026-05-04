@@ -28,6 +28,7 @@ local Players = game:GetService("Players")
 local GameConfig = require(ReplicatedStorage:WaitForChild("GameConfig"))
 
 local pass, fail = 0, 0
+local failures = {}  -- list of {label, expected, actual} for structured return
 local function check(label: string, actual: any, expected: any)
 	local ok = actual == expected
 	if ok then
@@ -35,8 +36,10 @@ local function check(label: string, actual: any, expected: any)
 		print(string.format("[VERIFY OK] %s = %s", label, tostring(actual)))
 	else
 		fail = fail + 1
-		warn(string.format("[VERIFY FAIL] %s expected=%s actual=%s",
-			label, tostring(expected), tostring(actual)))
+		local msg = string.format("%s expected=%s actual=%s",
+			label, tostring(expected), tostring(actual))
+		table.insert(failures, { label = label, expected = tostring(expected), actual = tostring(actual) })
+		warn("[VERIFY FAIL] " .. msg)
 	end
 end
 
@@ -175,3 +178,8 @@ if fail == 0 then
 else
 	warn(string.format("[VERIFY] ❌ %d check(s) failed — runtime has drifted from Sprint 8b design", fail))
 end
+
+-- Structured return for programmatic callers (e.g. MCP execute_luau).
+-- For Studio command-bar use, the return value is ignored — the print/warn
+-- output is the human-readable result.
+return { passed = pass, failed = fail, failures = failures }
