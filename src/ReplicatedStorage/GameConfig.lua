@@ -47,6 +47,11 @@ GameConfig.RARITY = {
 -- Type baselines: Pistol 75 / SMG 110 / Rifle 110 / Shotgun 99 / Sniper 110 / Knife 80.
 -- Hailstorm Minigun: option B (Damage 18 unchanged, SpinUp is the trade-off).
 -- See proposals/30-weapon-dps-retune.md for full table + per-weapon TTK.
+--
+-- Sprint 9 (Option A) — shop price realignment per CEO 2026-05-04 decision:
+-- tier-graduated discount aligning coin cost with post-(b) DPS reality.
+--   Common 0% / Uncommon 0% / Rare -5% / Epic -10% / Legendary -20% / Demon -25%
+-- See proposals/demon-shop-price-realignment.md.
 GameConfig.WEAPONS = {
 	-- ===== Common (5) — 1.00x DPS =====
 	["Viper Mk1"]      = { Type="Pistol",  Rarity="Common",    Price=  300, Damage= 30, FireRate=0.40, MagSize=12, ReloadTime=1.5, Range=200, Spread=0.020, Auto=false },  -- was 25
@@ -63,32 +68,32 @@ GameConfig.WEAPONS = {
 	["Stinger Burst"]  = { Type="SMG",     Rarity="Uncommon",  Price= 1800, Damage=  9, FireRate=0.07,  MagSize=32, ReloadTime=2.0, Range=140, Spread=0.045, Auto=true },  -- was 14
 
 	-- ===== Rare (5) — 1.30x DPS =====
-	["Reaver-X"]       = { Type="Rifle",   Rarity="Rare",      Price= 3000, Damage= 20, FireRate=0.14,  MagSize=30, ReloadTime=2.4, Range=320, Spread=0.020, Auto=true },  -- was 42
-	["Phantom Night"]  = { Type="Rifle",   Rarity="Rare",      Price= 3300, Damage= 17, FireRate=0.12,  MagSize=30, ReloadTime=2.3, Range=320, Spread=0.014, Auto=true },  -- was 38
-	["Thunder Guard"]  = { Type="Shotgun", Rarity="Rare",      Price= 3600, Damage= 12, Pellets=8, FireRate=0.75, MagSize=6, ReloadTime=2.7, Range=55, Spread=0.10, Auto=false },  -- was 14
-	["Wraith Hunter"]  = { Type="Sniper",  Rarity="Rare",      Price= 4000, Damage=172, FireRate=1.20,  MagSize=6,  ReloadTime=3.2, Range=480, Spread=0.006, Auto=false }, -- was 110
-	["Thunder Triple"] = { Type="Shotgun", Rarity="Rare",      Price= 4500, Damage= 11, Pellets=9, FireRate=0.80, MagSize=3, ReloadTime=3.5, Range=50, Spread=0.13, Auto=false },  -- was 15
+	["Reaver-X"]       = { Type="Rifle",   Rarity="Rare",      Price= 2850, Damage= 20, FireRate=0.14,  MagSize=30, ReloadTime=2.4, Range=320, Spread=0.020, Auto=true },  -- price was 3000 (-5%)
+	["Phantom Night"]  = { Type="Rifle",   Rarity="Rare",      Price= 3150, Damage= 17, FireRate=0.12,  MagSize=30, ReloadTime=2.3, Range=320, Spread=0.014, Auto=true },  -- price was 3300 (-5% rounded)
+	["Thunder Guard"]  = { Type="Shotgun", Rarity="Rare",      Price= 3400, Damage= 12, Pellets=8, FireRate=0.75, MagSize=6, ReloadTime=2.7, Range=55, Spread=0.10, Auto=false },  -- price was 3600 (-5% rounded)
+	["Wraith Hunter"]  = { Type="Sniper",  Rarity="Rare",      Price= 3800, Damage=172, FireRate=1.20,  MagSize=6,  ReloadTime=3.2, Range=480, Spread=0.006, Auto=false }, -- price was 4000 (-5%)
+	["Thunder Triple"] = { Type="Shotgun", Rarity="Rare",      Price= 4275, Damage= 11, Pellets=9, FireRate=0.80, MagSize=3, ReloadTime=3.5, Range=50, Spread=0.13, Auto=false },  -- price was 4500 (-5%)
 
 	-- ===== Epic (6) — 1.50x DPS =====
-	["Stinger Storm"]  = { Type="SMG",     Rarity="Epic",      Price= 7500, Damage= 12, FireRate=0.075, MagSize=35, ReloadTime=1.9, Range=170, Spread=0.035, Auto=true },  -- was 22
-	["Phantom Apex"]   = { Type="Rifle",   Rarity="Epic",      Price= 8000, Damage= 21, FireRate=0.13,  MagSize=30, ReloadTime=2.2, Range=340, Spread=0.013, Auto=true },  -- was 50
-	["Wraith Frost"]   = { Type="Sniper",  Rarity="Epic",      Price= 8500, Damage=190, FireRate=1.15,  MagSize=6,  ReloadTime=3.0, Range=520, Spread=0.005, Auto=false }, -- was 140
-	["Phantom Whisper"]= { Type="Rifle",   Rarity="Epic",      Price= 9000, Damage= 25, FireRate=0.15,  MagSize=24, ReloadTime=2.4, Range=360, Spread=0.011, Auto=true, Silent=true },  -- was 55 (Silent unchanged)
-	["Thunder Royal"]  = { Type="Shotgun", Rarity="Epic",      Price= 9800, Damage= 13, Pellets=8, FireRate=0.70, MagSize=6, ReloadTime=2.6, Range=60, Spread=0.09, Auto=false },  -- was 18
-	["Viper Left"]     = { Type="Pistol",  Rarity="Epic",      Price= 9800, Damage= 62, FireRate=0.55,  MagSize=6,  ReloadTime=1.8, Range=240, Spread=0.018, Auto=false },  -- was 70
+	["Stinger Storm"]  = { Type="SMG",     Rarity="Epic",      Price= 6750, Damage= 12, FireRate=0.075, MagSize=35, ReloadTime=1.9, Range=170, Spread=0.035, Auto=true },  -- price was 7500 (-10%)
+	["Phantom Apex"]   = { Type="Rifle",   Rarity="Epic",      Price= 7200, Damage= 21, FireRate=0.13,  MagSize=30, ReloadTime=2.2, Range=340, Spread=0.013, Auto=true },  -- price was 8000 (-10%)
+	["Wraith Frost"]   = { Type="Sniper",  Rarity="Epic",      Price= 7650, Damage=190, FireRate=1.15,  MagSize=6,  ReloadTime=3.0, Range=520, Spread=0.005, Auto=false }, -- price was 8500 (-10%)
+	["Phantom Whisper"]= { Type="Rifle",   Rarity="Epic",      Price= 8100, Damage= 25, FireRate=0.15,  MagSize=24, ReloadTime=2.4, Range=360, Spread=0.011, Auto=true, Silent=true },  -- price was 9000 (-10%) (Silent unchanged)
+	["Thunder Royal"]  = { Type="Shotgun", Rarity="Epic",      Price= 8800, Damage= 13, Pellets=8, FireRate=0.70, MagSize=6, ReloadTime=2.6, Range=60, Spread=0.09, Auto=false },  -- price was 9800 (-10% rounded)
+	["Viper Left"]     = { Type="Pistol",  Rarity="Epic",      Price= 8800, Damage= 62, FireRate=0.55,  MagSize=6,  ReloadTime=1.8, Range=240, Spread=0.018, Auto=false },  -- price was 9800 (-10% rounded)
 
 	-- ===== Legendary (5) — 1.70x DPS =====
-	["Viper Aurum"]    = { Type="Pistol",  Rarity="Legendary", Price=16000, Damage= 51, FireRate=0.40,  MagSize=12, ReloadTime=1.4, Range=260, Spread=0.015, Auto=false },  -- was 60
-	["Phantom Finale"] = { Type="Rifle",   Rarity="Legendary", Price=18000, Damage= 24, FireRate=0.13,  MagSize=30, ReloadTime=2.1, Range=360, Spread=0.012, Auto=true },  -- was 60
-	["Wraith Apex"]    = { Type="Sniper",  Rarity="Legendary", Price=20000, Damage=206, FireRate=1.10,  MagSize=6,  ReloadTime=2.9, Range=560, Spread=0.004, Auto=false }, -- was 170
-	["Thunder Crown"]  = { Type="Shotgun", Rarity="Legendary", Price=22000, Damage= 14, Pellets=8, FireRate=0.65, MagSize=6, ReloadTime=2.5, Range=65, Spread=0.085, Auto=false },  -- was 22
-	["Hailstorm"]      = { Type="Minigun", Rarity="Legendary", Price=25000, Damage= 18, FireRate=0.05,  MagSize=120,ReloadTime=4.5, Range=220, Spread=0.055, Auto=true, SpinUp=0.5 },  -- unchanged (option B)
+	["Viper Aurum"]    = { Type="Pistol",  Rarity="Legendary", Price=12800, Damage= 51, FireRate=0.40,  MagSize=12, ReloadTime=1.4, Range=260, Spread=0.015, Auto=false },  -- price was 16000 (-20%)
+	["Phantom Finale"] = { Type="Rifle",   Rarity="Legendary", Price=14400, Damage= 24, FireRate=0.13,  MagSize=30, ReloadTime=2.1, Range=360, Spread=0.012, Auto=true },  -- price was 18000 (-20%)
+	["Wraith Apex"]    = { Type="Sniper",  Rarity="Legendary", Price=16000, Damage=206, FireRate=1.10,  MagSize=6,  ReloadTime=2.9, Range=560, Spread=0.004, Auto=false }, -- price was 20000 (-20%)
+	["Thunder Crown"]  = { Type="Shotgun", Rarity="Legendary", Price=17600, Damage= 14, Pellets=8, FireRate=0.65, MagSize=6, ReloadTime=2.5, Range=65, Spread=0.085, Auto=false },  -- price was 22000 (-20%)
+	["Hailstorm"]      = { Type="Minigun", Rarity="Legendary", Price=20000, Damage= 18, FireRate=0.05,  MagSize=120,ReloadTime=4.5, Range=220, Spread=0.055, Auto=true, SpinUp=0.5 },  -- price was 25000 (-20%) (Damage unchanged option B)
 
 	-- ===== Demon (4) — 1.90x DPS =====
-	["Fang Demon"]     = { Type="Knife",   Rarity="Demon",     Price=35000, Damage= 76, AttackRate=0.50, Range=10 },  -- was 120
-	["Phantom Hellfire"]= {Type="Rifle",   Rarity="Demon",     Price=42000, Damage= 27, FireRate=0.13,  MagSize=30, ReloadTime=2.0, Range=380, Spread=0.012, Auto=true, Burn=true },  -- was 75 (Burn unchanged)
-	["Wraith Abyss"]   = { Type="Sniper",  Rarity="Demon",     Price=48000, Damage=220, FireRate=1.05,  MagSize=5,  ReloadTime=2.8, Range=600, Spread=0.003, Auto=false, Pierce=true },  -- was 210 (Pierce unchanged)
-	["Thunder Bloodmoon"]={Type="Shotgun", Rarity="Demon",     Price=55000, Damage= 14, Pellets=8, FireRate=0.60, MagSize=6, ReloadTime=2.3, Range=70, Spread=0.080, Auto=false },  -- was 28
+	["Fang Demon"]     = { Type="Knife",   Rarity="Demon",     Price=26250, Damage= 76, AttackRate=0.50, Range=10 },  -- price was 35000 (-25%)
+	["Phantom Hellfire"]= {Type="Rifle",   Rarity="Demon",     Price=31500, Damage= 27, FireRate=0.13,  MagSize=30, ReloadTime=2.0, Range=380, Spread=0.012, Auto=true, Burn=true },  -- price was 42000 (-25%) (Burn unchanged)
+	["Wraith Abyss"]   = { Type="Sniper",  Rarity="Demon",     Price=36000, Damage=220, FireRate=1.05,  MagSize=5,  ReloadTime=2.8, Range=600, Spread=0.003, Auto=false, Pierce=true },  -- price was 48000 (-25%) (Pierce unchanged)
+	["Thunder Bloodmoon"]={Type="Shotgun", Rarity="Demon",     Price=41250, Damage= 14, Pellets=8, FireRate=0.60, MagSize=6, ReloadTime=2.3, Range=70, Spread=0.080, Auto=false },  -- price was 55000 (-25%)
 }
 
 -- Default starter weapons — every player owns these from the start, no purchase needed

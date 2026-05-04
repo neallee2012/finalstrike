@@ -126,27 +126,29 @@ These need a human play session — recommend doing 1 manual playtest before ann
 
 ### Check counts（依執行 context）
 
-Script 有 **62 個 static checks** + 條件式 runtime checks。實際 pass 數隨呼叫時的遊戲狀態變動：
+> ⚠️ **2026-05-04 update**：Sprint 9a 在這個 script 加了 30 個 Price assertions（Sprint 9a price realignment 的 verification — 見 `receipts/sprint-9a-demon-price-realign.md`）。下方 count table 已更新為 **post-Sprint-9a current state**。
+
+Script 有 **92 個 static checks** + 條件式 runtime checks。實際 pass 數隨呼叫時的遊戲狀態變動：
 
 | Context | Static | Runtime NPC | HUD | **Total** |
 |---|---|---|---|---|
-| Lobby（無 NPC、HUD 已建）| 62 | 0 | 1 | **63** |
-| PvE（NPC + HUD 都有）| 62 | 6 | 1 | **69** |
-| Server-only / 沒 LocalPlayer | 62 | 0 or 6 | 0 | **62 / 68** |
+| Lobby（無 NPC、HUD 已建）| 92 | 0 | 1 | **93** |
+| PvE（NPC + HUD 都有）| 92 | 6 | 1 | **99** |
+| Server-only / 沒 LocalPlayer | 92 | 0 or 6 | 0 | **92 / 98** |
 
-Static 62 = base (2) + Rarity (6) + Weapons Damage (30) + Sniper Type (5) + ENEMIES HP/Damage (6) + LootTable presence (4) + Weapon-drop-removed (3) + LOOT 6-entry (6).
+Static 92 = base (2) + Rarity (6) + Weapons Damage (30) + Sniper Type (5) + ENEMIES HP/Damage (6) + LootTable presence (4) + Weapon-drop-removed (3) + LOOT 6-entry (6) + **Sprint 9a Weapons Price (30)**.
 
 Skipped sections print `[VERIFY SKIP]` lines explaining why（無 NPC / 無 HUD / server-only），不計入 fail。
 
-### Last self-test result（2026-05-04, MCP execute_luau on `最後一擊` instance, PvE phase with HUD）
+### Self-test history
 
-```
-{ passed = 69, failed = 0, failures = [], hasNpcs = true, hadHud = true }
-```
+**Sprint 8b merge (2026-05-04, pre-Sprint-9a)**: `{ passed = 69, failed = 0, failures = [], hasNpcs = true, hadHud = true }` — 62 static + 6 runtime NPC + 1 HUD，完整覆蓋當時設計合約。
 
-69/69 通過 = 62 static + 6 runtime NPC + 1 HUD = 完整覆蓋。
+**Sprint 9a merge (2026-05-04, post-Sprint-9a)**: `{ passed = 99, failed = 0, failures = [], hasNpcs = true, hadHud = true }` — 92 static + 6 runtime NPC + 1 HUD，完整覆蓋 Sprint 8b + 9a 合約。
 
-Screenshot at `sprint_8b_pve_phase` (MCP session-bound) 仍可作為視覺輔助，但不再是審計主憑據 — 以 `verification/sprint-8b-runtime-checks.lua` 的 structured return 為準。
+> 兩次都是同一個 script 跑出來的；69→99 的 +30 差距完全來自 Sprint 9a 加入的 Price assertions。CEO 拍板 Option A 後 30 個 Price 全部對齊 = 0 fail。
+
+Screenshot at `sprint_8b_pve_phase` (MCP session-bound) 仍可作為視覺輔助，但不再是審計主憑據 — 以 `verification/sprint-8b-runtime-checks.lua` 的 structured return 為準。腳本 header docstring 永遠保有當前 count breakdown。
 
 ## Next
 
