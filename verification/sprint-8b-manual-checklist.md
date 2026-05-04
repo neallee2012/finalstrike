@@ -22,7 +22,8 @@ Purpose: Close the 5 integration tests that `verification/sprint-8b-runtime-chec
 
 - [ ] **Open Studio** at the Final Strike place
 - [ ] **Press Play** — 進大廳
-- [ ] **F9 開 Output 視窗** — 等等要看 server 端的 `[damagePlayer]` log 與 NPCDamaged 數字
+- [ ] **F9 開 Output 視窗** — Test 4 要看 server 端的 `[damagePlayer]` log（玩家受傷會印；NPC 受傷**不會**印 console）
+- [ ] **左側 Explorer 視窗顯示** — Tests 1/2/5 要直接看 NPC model 的 HP attribute 變化驗證 dmg 數字（NPC 受傷無 console log，但有頭頂浮動傷害數字 + Explorer 即時 HP）
 
 ---
 
@@ -66,21 +67,25 @@ Purpose: Close the 5 integration tests that `verification/sprint-8b-runtime-chec
 - [ ] 確認手上拿的是 **Wraith Scout**（不是 Viper Mk1）
 - [ ] 找一隻 Patrol NPC（120 HP）站著沒動的目標
 
+> **如何觀察 NPC 受傷數字**：MatchManager FireWeapon → NPCDamaged event → HUDController 在 NPC 頭上 spawn 一個 floating BillboardGui 顯示傷害數字（不是 console print）。觀察方式：
+> - **方式 A（最直觀）**：射擊瞬間看 NPC 頭頂浮動的傷害數字
+> - **方式 B（精確）**：Studio Explorer → workspace → 點該 NPC model → Properties 旁的 Attributes 頁籤看 HP attribute 即時變化
+> - 注意：Server 端**沒有** print NPC 受傷的 console log（不像玩家受傷會印 `[damagePlayer]`）
+
 **Action A — body shot**:
 - [ ] 對 Patrol 的 Torso (UpperTorso) 開 1 槍
-- [ ] 觀察 Patrol HP attribute（可在 Studio Explorer 看 NPC model.HP，或看 NPCDamaged event 印出的 dmg）
 
 **Expected**:
-- [ ] Damage = **120**（NPC HP 120 → 0，秒殺；console 印 NPCDamaged 數字 = 120）
+- [ ] 浮動傷害數字顯示 **120**（或 Explorer NPC.HP 從 120 → 0，秒殺）
 
 **Action B — headshot**:
 - [ ] 等下一隻活的 Patrol（剛剛 body shot 一發秒殺，要找新的）
 - [ ] 對 Patrol 的 **Head** 部位開 1 槍
 
 **Expected**:
-- [ ] Damage = **240**（120 × HEADSHOT_MULTIPLIER 2.0；對 Patrol 120 HP 是 overkill，秒殺；NPCDamaged 印 240）
+- [ ] 浮動傷害數字顯示 **240**（120 × HEADSHOT_MULTIPLIER 2.0；對 Patrol 120 HP 是 overkill 秒殺；Explorer NPC.HP 從 120 → -120）
 
-**Pass criteria**：body 120 dmg / head 240 dmg 兩個數值都在 console 看到
+**Pass criteria**：body 120 dmg / head 240 dmg 兩個數值都看到（floating number 或 Explorer attribute）
 
 ---
 
@@ -92,8 +97,8 @@ Purpose: Close the 5 integration tests that `verification/sprint-8b-runtime-chec
 - [ ] 對 Patrol 的 **Head** 部位開 1 槍
 
 **Expected**:
-- [ ] Damage = **30**（不是 60）— Pistol Type 不該觸發 HEADSHOT_MULTIPLIER
-- [ ] Console NPCDamaged event 印 30，**NOT** 60
+- [ ] 浮動傷害數字 = **30**（不是 60）— Pistol Type 不該觸發 HEADSHOT_MULTIPLIER
+- [ ] Explorer 看 Patrol.HP 從 120 → 90（drop 30，不是 60）
 
 **Why this matters**: 確認 `MatchManager.lua` FireWeapon handler 的 `if config.Type == "Sniper" and isHeadshot` 條件嚴格只 Sniper 適用，沒有 leak 到其他 Type。
 
@@ -139,9 +144,12 @@ Purpose: Close the 5 integration tests that `verification/sprint-8b-runtime-chec
 - 12 hits × 1.0s = **約 12 秒**（含 spawn protection 後的時間）
 - Sprint 8b 之前是 100 HP / 10 dmg = 10 hits / 10 秒
 
+> 玩家受傷**有** server console log：每次中槍 console 印一行 `[damagePlayer] <你的名字> -18 (X->Y) by NPC`。Test 4 可以靠這個 log 計次／確認 dmg=18。
+
 **Pass criteria**：
 - [ ] 從第一發攻擊到死 ~12 秒（容差 ±2 秒）
 - [ ] HUD HP 條從 200 線性降到 0
+- [ ] Console 看到 12 行 `[damagePlayer] ... -18 ...` log
 - [ ] 死後切觀戰相機（spectator camera）
 
 ---
@@ -173,7 +181,7 @@ Purpose: Close the 5 integration tests that `verification/sprint-8b-runtime-chec
 **Expected**:
 - [ ] Damage = **120**（命中 "Hood" 或 "HoodFront"，不是 "Head"）
 
-**Pass criteria**：3 種 NPC 戴的 accessory 命中時 console NPCDamaged 都印 120，不是 240。如果**有任何一個** accessory 觸發 240 → 設計 bug，hitPart.Name 邏輯需要修。
+**Pass criteria**：3 種 NPC 戴的 accessory 命中時，浮動傷害數字（或 Explorer NPC.HP 變化）都顯示 **120**，不是 240。如果**有任何一個** accessory 觸發 240 → 設計 bug，hitPart.Name 邏輯需要修。
 
 ---
 
