@@ -56,13 +56,19 @@ local function ensureLeftHandIK(char, tool)
 	if not leftGrip or not leftGrip:IsA("Attachment") then return nil end
 
 	local leftHand = char:FindFirstChild("LeftHand")
-	local leftUpperArm = char:FindFirstChild("LeftUpperArm")
-	if not leftHand or not leftUpperArm then return nil end
+	-- (#39 round 2) ChainRoot was LeftUpperArm — only 2 joints (elbow + wrist),
+	-- not enough reach to bring LeftHand across the body to LeftGrip (which
+	-- sits ~1 stud forward from RightHand on the Handle). Anatomically the
+	-- shoulder has to rotate too. UpperTorso gives the IK solver 3 joints:
+	-- LeftShoulder + LeftElbow + LeftWrist. Now the off-hand can actually
+	-- reach the LeftGrip Attachment.
+	local upperTorso = char:FindFirstChild("UpperTorso")
+	if not leftHand or not upperTorso then return nil end
 
 	local ik = Instance.new("IKControl")
 	ik.Name = "LeftHandIK"
 	ik.Type = Enum.IKControlType.Position
-	ik.ChainRoot = leftUpperArm
+	ik.ChainRoot = upperTorso
 	ik.EndEffector = leftHand
 	ik.Target = leftGrip  -- IKControl accepts Attachment targets
 	ik.Weight = 1.0
@@ -71,6 +77,11 @@ local function ensureLeftHandIK(char, tool)
 	-- grip pose — without this, hand pops off the gun mid-jump.
 	ik.Priority = 1000
 	ik.Parent = humanoid
+
+	print(string.format(
+		"[ViewmodelController] LeftHandIK active: tool=%s ChainRoot=%s Target=%s",
+		tool.Name, upperTorso.Name, leftGrip:GetFullName()
+	))
 	return ik
 end
 
