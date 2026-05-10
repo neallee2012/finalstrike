@@ -615,24 +615,35 @@ end
 -- Called after buildLobby has placed the basic walls/floor/StartMatchPad.
 -- Reference image: dark industrial sci-fi with red neon accents.
 function MAP.upgradeLobbyVisuals(lobby)
-	-- (#41) BIG BANNER on the upper +Z wall. Sits above the GunShopPedestal
-	-- height so the player at spawn (eye y~4.5) sees the full banner over
-	-- the shop counter. Banner y range: 9-19 (top of wall).
+	-- (#41) BIG BANNER on the upper +Z wall (y=10-19), above shop top (y=6).
+	-- Includes Neon accent strips top + bottom for the cinematic concept-art
+	-- look (red edge lighting framing the panel).
 	local bannerWall = makePart({
 		Name = "BannerWall",
-		Size = Vector3.new(60, 10, 1),
-		Position = Vector3.new(0, 14, 39),
-		Color = Color3.fromRGB(15, 15, 20),
+		Size = Vector3.new(60, 9, 1),
+		Position = Vector3.new(0, 14.5, 39),
+		Color = Color3.fromRGB(18, 18, 25),
 		Material = Enum.Material.SmoothPlastic,
 		Parent = lobby,
 	})
+	-- Red neon accent strips framing the banner top + bottom
+	for _, y in ipairs({ 19.2, 9.8 }) do
+		local strip = makePart({
+			Name = "BannerAccent",
+			Size = Vector3.new(60, 0.3, 0.3),
+			Position = Vector3.new(0, y, 38.6),
+			Color = Color3.fromRGB(255, 60, 50),
+			Material = Enum.Material.Neon,
+			Parent = lobby,
+		})
+		addLight(strip, Color3.fromRGB(255, 60, 50), 1.5, 30)
+	end
 	local bannerGui = Instance.new("SurfaceGui")
-	bannerGui.Face = Enum.NormalId.Back  -- -Z face, visible from inside the room
-	bannerGui.LightInfluence = 0          -- always render at full brightness
-	bannerGui.AlwaysOnTop = false
+	bannerGui.Face = Enum.NormalId.Back
+	bannerGui.LightInfluence = 0
+	bannerGui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
 	bannerGui.PixelsPerStud = 50
 	bannerGui.Parent = bannerWall
-	-- Helper for stroked text labels (visibility against dark wall)
 	local function makeBannerLabel(name, text, sizeY, posY, color, font)
 		local lbl = Instance.new("TextLabel")
 		lbl.Name = name
@@ -644,14 +655,15 @@ function MAP.upgradeLobbyVisuals(lobby)
 		lbl.TextScaled = true
 		lbl.Font = font
 		lbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-		lbl.TextStrokeTransparency = 0.4
+		lbl.TextStrokeTransparency = 0.2
 		lbl.Parent = bannerGui
 		return lbl
 	end
-	makeBannerLabel("TitleLine", "🎯  FINAL STRIKE", 0.18, 0.02, Color3.fromRGB(255, 60, 50), Enum.Font.GothamBlack)
-	makeBannerLabel("OneLife", "ONE LIFE", 0.36, 0.20, Color3.fromRGB(255, 255, 255), Enum.Font.GothamBlack)
+	makeBannerLabel("TitleLine", "🎯  FINAL STRIKE", 0.16, 0.02, Color3.fromRGB(255, 60, 50), Enum.Font.GothamBlack)
+	makeBannerLabel("OneLife", "ONE LIFE", 0.36, 0.18, Color3.fromRGB(255, 255, 255), Enum.Font.GothamBlack)
 	makeBannerLabel("Tagline1", "WHO SHOOTS, WHO WINS", 0.18, 0.58, Color3.fromRGB(255, 60, 50), Enum.Font.GothamBold)
 	makeBannerLabel("Tagline2", "WHO DOESN'T SHOOT, WHO DIES FIRST", 0.18, 0.78, Color3.fromRGB(220, 220, 220), Enum.Font.GothamMedium)
+	print("[MapBuilder] Lobby banner labels created: TitleLine, OneLife, Tagline1, Tagline2")
 
 	-- GUN SHOP pedestal — visible "shop" landmark in the lobby center.
 	-- Shop UI still opens with B (existing ShopController), this is a visual cue.
@@ -663,14 +675,14 @@ function MAP.upgradeLobbyVisuals(lobby)
 		Material = Enum.Material.Metal,
 		Parent = lobby,
 	})
-	-- (#41) Height 5 (was 6) — short enough that the upper-half BannerWall
-	-- (y=9-19) clears the shop top (y=5) from spawn eye-level. Tall enough
-	-- that the SurfaceGui's text doesn't get squished by an extreme aspect
-	-- ratio (14:5 = 2.8:1 reads cleanly).
+	-- (#41) Height 5, raised so the bottom (y=1) sits exactly on the pedestal
+	-- top — previously bottom was at y=0, embedded in the floor and the
+	-- pedestal blocked the lower portion of the SurfaceGui (PRESS B TO OPEN
+	-- got clipped). Now the full 5-stud face is visible from spawn.
 	local shopBack = makePart({
 		Name = "GunShopBack",
 		Size = Vector3.new(14, 5, 1),
-		Position = Vector3.new(0, 2.5, 4),
+		Position = Vector3.new(0, 3.5, 4),
 		Color = Color3.fromRGB(20, 20, 25),
 		Material = Enum.Material.SmoothPlastic,
 		Parent = lobby,
@@ -683,7 +695,7 @@ function MAP.upgradeLobbyVisuals(lobby)
 	shopGui.Parent = shopBack
 	local shopLbl = Instance.new("TextLabel")
 	shopLbl.Size = UDim2.new(1, 0, 0.55, 0)
-	shopLbl.Position = UDim2.new(0, 0, 0, 0)
+	shopLbl.Position = UDim2.new(0, 0, 0.05, 0)
 	shopLbl.BackgroundTransparency = 1
 	shopLbl.Text = "GUN SHOP"
 	shopLbl.TextColor3 = Color3.fromRGB(255, 60, 50)
@@ -691,8 +703,8 @@ function MAP.upgradeLobbyVisuals(lobby)
 	shopLbl.Font = Enum.Font.GothamBlack
 	shopLbl.Parent = shopGui
 	local shopHint = Instance.new("TextLabel")
-	shopHint.Size = UDim2.new(1, 0, 0.35, 0)
-	shopHint.Position = UDim2.new(0, 0, 0.6, 0)
+	shopHint.Size = UDim2.new(1, 0, 0.30, 0)
+	shopHint.Position = UDim2.new(0, 0, 0.65, 0)
 	shopHint.BackgroundTransparency = 1
 	shopHint.Text = "PRESS  B  TO OPEN"
 	shopHint.TextColor3 = Color3.fromRGB(255, 215, 0)
