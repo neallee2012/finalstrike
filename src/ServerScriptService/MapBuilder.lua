@@ -745,8 +745,14 @@ function MAP.upgradeLobbyVisuals(lobby)
 		Material = Enum.Material.SmoothPlastic,
 		Parent = lobby,
 	})
+	-- (#41) Explicit PixelsPerStud sizing keeps the 14:3 surface aspect correct
+	-- so "NPC TRAINING ARENA" doesn't render vertically squished. Same fix as
+	-- the GUN SHOP SurfaceGui.
 	local archGui = Instance.new("SurfaceGui")
 	archGui.Face = Enum.NormalId.Right  -- +X face (toward room interior)
+	archGui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	archGui.PixelsPerStud = 50
+	archGui.LightInfluence = 0
 	archGui.Parent = archSign
 	local archLbl = Instance.new("TextLabel")
 	archLbl.Size = UDim2.new(1, 0, 1, 0)
@@ -755,6 +761,8 @@ function MAP.upgradeLobbyVisuals(lobby)
 	archLbl.TextColor3 = Color3.fromRGB(255, 60, 50)
 	archLbl.TextScaled = true
 	archLbl.Font = Enum.Font.GothamBold
+	archLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+	archLbl.TextStrokeTransparency = 0.3
 	archLbl.Parent = archGui
 	-- Touch pad in front of the arch — TrainingService listens for Touched
 	local trainingPad = makePart({
