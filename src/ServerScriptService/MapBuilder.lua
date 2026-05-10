@@ -144,27 +144,11 @@ function MAP.buildLobby(parent)
 	})
 	addSpotLight(centerLight, Color3.fromRGB(255, 220, 200), 2, 50, 60)
 
-	-- Title sign
-	local sign = Instance.new("Part")
-	sign.Name = "TitleSign"
-	sign.Anchored = true
-	sign.Size = Vector3.new(30, 6, 1)
-	sign.Position = Vector3.new(0, 12, -39)
-	sign.Color = Color3.fromRGB(25, 25, 30)
-	sign.Material = Enum.Material.SmoothPlastic
-	sign.Parent = lobby
-
-	local sg = Instance.new("SurfaceGui")
-	sg.Face = Enum.NormalId.Front
-	sg.Parent = sign
-	local titleLabel = Instance.new("TextLabel")
-	titleLabel.Size = UDim2.new(1, 0, 1, 0)
-	titleLabel.BackgroundTransparency = 1
-	titleLabel.Text = "FINAL STRIKE"
-	titleLabel.TextColor3 = Color3.fromRGB(255, 60, 50)
-	titleLabel.TextScaled = true
-	titleLabel.Font = Enum.Font.GothamBold
-	titleLabel.Parent = sg
+	-- (#41) The full FINAL STRIKE / ONE LIFE / tagline banner is built by
+	-- upgradeLobbyVisuals() on the +Z wall (BannerWall). The spawn below is
+	-- rotated 180° to face +Z so players see that banner on entry. We no
+	-- longer create a small TitleSign on the -Z wall (it was redundant and
+	-- only visible if the player turned around).
 
 	-- Start match trigger pad
 	local startPad = makePart({
@@ -189,10 +173,13 @@ function MAP.buildLobby(parent)
 	padLabel.Font = Enum.Font.GothamBold
 	padLabel.Parent = padGui
 
-	-- Spawn location in lobby
+	-- Spawn location in lobby. (#41) Rotated 180° on Y so players spawn
+	-- facing +Z toward the BannerWall (built in upgradeLobbyVisuals). Without
+	-- this, default SpawnLocation orientation makes new players face -Z and
+	-- they never see the FINAL STRIKE / ONE LIFE / tagline banner.
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "LobbySpawn"
-	spawn.Position = Vector3.new(0, 1, -10)
+	spawn.CFrame = CFrame.new(0, 1, -10) * CFrame.Angles(0, math.rad(180), 0)
 	spawn.Size = Vector3.new(6, 1, 6)
 	spawn.Anchored = true
 	spawn.CanCollide = false
@@ -628,63 +615,55 @@ end
 -- Called after buildLobby has placed the basic walls/floor/StartMatchPad.
 -- Reference image: dark industrial sci-fi with red neon accents.
 function MAP.upgradeLobbyVisuals(lobby)
-	-- BIG BANNER on the wall opposite the LobbySpawn (z=+41 side, since spawn
-	-- at z=-10 faces +Z by default). Two stacked SurfaceGuis: top = FINAL STRIKE,
-	-- bottom = ONE LIFE tagline.
+	-- (#41) BIG BANNER on the upper +Z wall (y=10-19), above shop top (y=6).
+	-- Includes Neon accent strips top + bottom for the cinematic concept-art
+	-- look (red edge lighting framing the panel).
 	local bannerWall = makePart({
 		Name = "BannerWall",
-		Size = Vector3.new(50, 14, 1),
-		Position = Vector3.new(0, 11, 39),
-		Color = Color3.fromRGB(15, 15, 20),
+		Size = Vector3.new(60, 9, 1),
+		Position = Vector3.new(0, 14.5, 39),
+		Color = Color3.fromRGB(18, 18, 25),
 		Material = Enum.Material.SmoothPlastic,
 		Parent = lobby,
 	})
+	-- Red neon accent strips framing the banner top + bottom
+	for _, y in ipairs({ 19.2, 9.8 }) do
+		local strip = makePart({
+			Name = "BannerAccent",
+			Size = Vector3.new(60, 0.3, 0.3),
+			Position = Vector3.new(0, y, 38.6),
+			Color = Color3.fromRGB(255, 60, 50),
+			Material = Enum.Material.Neon,
+			Parent = lobby,
+		})
+		addLight(strip, Color3.fromRGB(255, 60, 50), 1.5, 30)
+	end
 	local bannerGui = Instance.new("SurfaceGui")
-	bannerGui.Face = Enum.NormalId.Back  -- -Z face, visible from inside the room
+	bannerGui.Face = Enum.NormalId.Back
+	bannerGui.LightInfluence = 0
+	bannerGui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	bannerGui.PixelsPerStud = 50
 	bannerGui.Parent = bannerWall
-	-- Title row
-	local title = Instance.new("TextLabel")
-	title.Name = "TitleLine"
-	title.Size = UDim2.new(1, 0, 0.25, 0)
-	title.Position = UDim2.new(0, 0, 0, 0)
-	title.BackgroundTransparency = 1
-	title.Text = "🎯  FINAL STRIKE"
-	title.TextColor3 = Color3.fromRGB(255, 60, 50)
-	title.TextScaled = true
-	title.Font = Enum.Font.GothamBlack
-	title.Parent = bannerGui
-	-- ONE LIFE big text
-	local oneLife = Instance.new("TextLabel")
-	oneLife.Name = "OneLife"
-	oneLife.Size = UDim2.new(1, 0, 0.35, 0)
-	oneLife.Position = UDim2.new(0, 0, 0.25, 0)
-	oneLife.BackgroundTransparency = 1
-	oneLife.Text = "ONE LIFE"
-	oneLife.TextColor3 = Color3.fromRGB(255, 255, 255)
-	oneLife.TextScaled = true
-	oneLife.Font = Enum.Font.GothamBlack
-	oneLife.Parent = bannerGui
-	-- Tagline rows (two lines)
-	local tagline = Instance.new("TextLabel")
-	tagline.Name = "Tagline1"
-	tagline.Size = UDim2.new(1, 0, 0.18, 0)
-	tagline.Position = UDim2.new(0, 0, 0.6, 0)
-	tagline.BackgroundTransparency = 1
-	tagline.Text = "WHO SHOOTS, WHO WINS"
-	tagline.TextColor3 = Color3.fromRGB(255, 60, 50)
-	tagline.TextScaled = true
-	tagline.Font = Enum.Font.GothamBold
-	tagline.Parent = bannerGui
-	local tagline2 = Instance.new("TextLabel")
-	tagline2.Name = "Tagline2"
-	tagline2.Size = UDim2.new(1, 0, 0.18, 0)
-	tagline2.Position = UDim2.new(0, 0, 0.78, 0)
-	tagline2.BackgroundTransparency = 1
-	tagline2.Text = "WHO DOESN'T SHOOT, WHO DIES FIRST"
-	tagline2.TextColor3 = Color3.fromRGB(220, 220, 220)
-	tagline2.TextScaled = true
-	tagline2.Font = Enum.Font.GothamMedium
-	tagline2.Parent = bannerGui
+	local function makeBannerLabel(name, text, sizeY, posY, color, font)
+		local lbl = Instance.new("TextLabel")
+		lbl.Name = name
+		lbl.Size = UDim2.new(1, 0, sizeY, 0)
+		lbl.Position = UDim2.new(0, 0, posY, 0)
+		lbl.BackgroundTransparency = 1
+		lbl.Text = text
+		lbl.TextColor3 = color
+		lbl.TextScaled = true
+		lbl.Font = font
+		lbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+		lbl.TextStrokeTransparency = 0.2
+		lbl.Parent = bannerGui
+		return lbl
+	end
+	makeBannerLabel("TitleLine", "🎯  FINAL STRIKE", 0.16, 0.02, Color3.fromRGB(255, 60, 50), Enum.Font.GothamBlack)
+	makeBannerLabel("OneLife", "ONE LIFE", 0.36, 0.18, Color3.fromRGB(255, 255, 255), Enum.Font.GothamBlack)
+	makeBannerLabel("Tagline1", "WHO SHOOTS, WHO WINS", 0.18, 0.58, Color3.fromRGB(255, 60, 50), Enum.Font.GothamBold)
+	makeBannerLabel("Tagline2", "WHO DOESN'T SHOOT, WHO DIES FIRST", 0.18, 0.78, Color3.fromRGB(220, 220, 220), Enum.Font.GothamMedium)
+	print("[MapBuilder] Lobby banner labels created: TitleLine, OneLife, Tagline1, Tagline2")
 
 	-- GUN SHOP pedestal — visible "shop" landmark in the lobby center.
 	-- Shop UI still opens with B (existing ShopController), this is a visual cue.
@@ -696,20 +675,27 @@ function MAP.upgradeLobbyVisuals(lobby)
 		Material = Enum.Material.Metal,
 		Parent = lobby,
 	})
+	-- (#41) Height 5, raised so the bottom (y=1) sits exactly on the pedestal
+	-- top — previously bottom was at y=0, embedded in the floor and the
+	-- pedestal blocked the lower portion of the SurfaceGui (PRESS B TO OPEN
+	-- got clipped). Now the full 5-stud face is visible from spawn.
 	local shopBack = makePart({
 		Name = "GunShopBack",
-		Size = Vector3.new(14, 6, 1),
-		Position = Vector3.new(0, 4, 4),
+		Size = Vector3.new(14, 5, 1),
+		Position = Vector3.new(0, 3.5, 4),
 		Color = Color3.fromRGB(20, 20, 25),
 		Material = Enum.Material.SmoothPlastic,
 		Parent = lobby,
 	})
 	local shopGui = Instance.new("SurfaceGui")
 	shopGui.Face = Enum.NormalId.Front  -- -Z (toward spawn at z=-10)
+	shopGui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	shopGui.PixelsPerStud = 50
+	shopGui.LightInfluence = 0
 	shopGui.Parent = shopBack
 	local shopLbl = Instance.new("TextLabel")
 	shopLbl.Size = UDim2.new(1, 0, 0.55, 0)
-	shopLbl.Position = UDim2.new(0, 0, 0, 0)
+	shopLbl.Position = UDim2.new(0, 0, 0.05, 0)
 	shopLbl.BackgroundTransparency = 1
 	shopLbl.Text = "GUN SHOP"
 	shopLbl.TextColor3 = Color3.fromRGB(255, 60, 50)
@@ -717,8 +703,8 @@ function MAP.upgradeLobbyVisuals(lobby)
 	shopLbl.Font = Enum.Font.GothamBlack
 	shopLbl.Parent = shopGui
 	local shopHint = Instance.new("TextLabel")
-	shopHint.Size = UDim2.new(1, 0, 0.35, 0)
-	shopHint.Position = UDim2.new(0, 0, 0.6, 0)
+	shopHint.Size = UDim2.new(1, 0, 0.30, 0)
+	shopHint.Position = UDim2.new(0, 0, 0.65, 0)
 	shopHint.BackgroundTransparency = 1
 	shopHint.Text = "PRESS  B  TO OPEN"
 	shopHint.TextColor3 = Color3.fromRGB(255, 215, 0)
