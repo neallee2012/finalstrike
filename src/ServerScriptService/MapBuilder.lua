@@ -615,14 +615,13 @@ end
 -- Called after buildLobby has placed the basic walls/floor/StartMatchPad.
 -- Reference image: dark industrial sci-fi with red neon accents.
 function MAP.upgradeLobbyVisuals(lobby)
-	-- (#41) BIG BANNER on the +Z wall (spawn now rotated to face +Z).
-	-- Raised + enlarged so the GunShopPedestal in the lobby foreground
-	-- doesn't block the lower lines from eye level. Banner spans most of
-	-- the wall height to dominate the view on entry.
+	-- (#41) BIG BANNER on the upper +Z wall. Sits above the GunShopPedestal
+	-- height so the player at spawn (eye y~4.5) sees the full banner over
+	-- the shop counter. Banner y range: 9-19 (top of wall).
 	local bannerWall = makePart({
 		Name = "BannerWall",
-		Size = Vector3.new(60, 16, 1),
-		Position = Vector3.new(0, 11, 39),
+		Size = Vector3.new(60, 10, 1),
+		Position = Vector3.new(0, 14, 39),
 		Color = Color3.fromRGB(15, 15, 20),
 		Material = Enum.Material.SmoothPlastic,
 		Parent = lobby,
@@ -664,18 +663,23 @@ function MAP.upgradeLobbyVisuals(lobby)
 		Material = Enum.Material.Metal,
 		Parent = lobby,
 	})
-	-- (#41) Lowered from height 6 to 3.5 so it doesn't block the BannerWall
-	-- sightline from spawn eye-level (~y=4.5). Top now sits at y=3.5.
+	-- (#41) Height 5 (was 6) — short enough that the upper-half BannerWall
+	-- (y=9-19) clears the shop top (y=5) from spawn eye-level. Tall enough
+	-- that the SurfaceGui's text doesn't get squished by an extreme aspect
+	-- ratio (14:5 = 2.8:1 reads cleanly).
 	local shopBack = makePart({
 		Name = "GunShopBack",
-		Size = Vector3.new(14, 3.5, 1),
-		Position = Vector3.new(0, 1.75, 4),
+		Size = Vector3.new(14, 5, 1),
+		Position = Vector3.new(0, 2.5, 4),
 		Color = Color3.fromRGB(20, 20, 25),
 		Material = Enum.Material.SmoothPlastic,
 		Parent = lobby,
 	})
 	local shopGui = Instance.new("SurfaceGui")
 	shopGui.Face = Enum.NormalId.Front  -- -Z (toward spawn at z=-10)
+	shopGui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	shopGui.PixelsPerStud = 50
+	shopGui.LightInfluence = 0
 	shopGui.Parent = shopBack
 	local shopLbl = Instance.new("TextLabel")
 	shopLbl.Size = UDim2.new(1, 0, 0.55, 0)
