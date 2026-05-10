@@ -498,22 +498,33 @@ function NPCSystem.cleanup()
 	activeNPCs = {}
 end
 
--- Listen for phase changes to spawn/cleanup
-local PhaseChanged = events:WaitForChild("PhaseChanged")
-
--- We spawn NPCs when server enters PvE phase
--- Since PhaseChanged fires to clients, we use _G to detect phase from MatchManager
+-- React to phase changes via MatchManager.PhaseChangedServer (server-only
+-- BindableEvent) instead of polling. MatchManager loads asynchronously via
+-- task.defer at its tail, so the event may not exist on this script's first
+-- pass — we wait briefly and retry. After connection, spawning is instant
+-- on phase enter (was up to 1s late under the old poll loop).
 task.spawn(function()
-	while true do
-		task.wait(1)
-		local mm = _G.MatchManager
-		if mm and mm.CurrentPhase == GameConfig.PHASE.PVE and #activeNPCs == 0 then
+	local mm
+	for _ = 1, 50 do  -- ~5s max wait
+		mm = _G.MatchManager
+		if mm and mm.PhaseChangedServer then break end
+		task.wait(0.1)
+	end
+	if not mm or not mm.PhaseChangedServer then
+		warn("[NPCSystem] MatchManager.PhaseChangedServer never appeared; NPCs won't spawn")
+		return
+	end
+	mm.PhaseChangedServer:Connect(function(phase)
+		if phase == GameConfig.PHASE.PVE and #activeNPCs == 0 then
 			NPCSystem.spawnNPCs()
-		elseif mm and mm.CurrentPhase == GameConfig.PHASE.LOBBY then
-			if #activeNPCs > 0 then
-				NPCSystem.cleanup()
-			end
+		elseif phase == GameConfig.PHASE.LOBBY and #activeNPCs > 0 then
+			NPCSystem.cleanup()
 		end
+	end)
+	-- If we connected after PvE already started (unlikely but possible on hot
+	-- reload), kick the spawn manually so the match isn't empty.
+	if mm.CurrentPhase == GameConfig.PHASE.PVE and #activeNPCs == 0 then
+		NPCSystem.spawnNPCs()
 	end
 end)
 

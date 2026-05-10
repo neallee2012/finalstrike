@@ -160,10 +160,23 @@ Players.PlayerRemoving:Connect(function(player)
 	loaded[player] = nil
 end)
 
--- Save all on shutdown (BindToClose runs synchronously with ~30s budget)
+-- Save all on shutdown. BindToClose has a ~30s budget; sequential SetAsync
+-- per-player would risk timing out under DataStore throttling with 12 players,
+-- so we spawn each save on its own task and wait for all to settle.
 game:BindToClose(function()
+	local pending = 0
 	for player, _ in pairs(data) do
-		savePlayer(player)
+		pending = pending + 1
+		task.spawn(function()
+			savePlayer(player)
+			pending = pending - 1
+		end)
+	end
+	-- Block BindToClose until all spawned saves complete (or 25s elapsed,
+	-- leaving 5s slack inside the engine's 30s shutdown budget).
+	local deadline = tick() + 25
+	while pending > 0 and tick() < deadline do
+		task.wait(0.1)
 	end
 end)
 

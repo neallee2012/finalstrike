@@ -3,12 +3,16 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local GameConfig = require(ReplicatedStorage:WaitForChild("GameConfig"))
 local events = ReplicatedStorage:WaitForChild("GameEvents")
 
 local LootSystem = {}
-local activeLoot = {}
+local activeLoot = {}  -- list of Part instances
+-- Per-pickup bob state, keyed by Part. One Heartbeat below drives all of them
+-- in a single pass — replaces N coroutines × 33Hz of task.wait(0.03) loops.
+local bobState = {}    -- [Part] = { StartY = number, Phase = number }
 
 local function createPickup(lootType, position)
 	local part = Instance.new("Part")
@@ -42,17 +46,9 @@ local function createPickup(lootType, position)
 	light.Range = 12
 	light.Parent = part
 
-	-- Bobbing animation
-	local startY = part.Position.Y
-	task.spawn(function()
-		local t = math.random() * math.pi * 2
-		while part and part.Parent do
-			t = t + 0.05
-			part.Position = Vector3.new(part.Position.X, startY + math.sin(t) * 0.5, part.Position.Z)
-			part.Orientation = Vector3.new(0, t * 30 % 360, 0)
-			task.wait(0.03)
-		end
-	end)
+	-- Register bob state; the central Heartbeat below ticks every active
+	-- pickup in one pass.
+	bobState[part] = { StartY = part.Position.Y, Phase = math.random() * math.pi * 2 }
 
 	-- Pickup on touch. `consumed` guards idempotency — Roblox fires Touched
 	-- once per character part that intersects (head, torso, legs, arms…) so a
@@ -98,10 +94,11 @@ local function createPickup(lootType, position)
 
 		events.LootPickedUp:FireClient(player, lootType, 1)
 
-		-- Remove from active list & destroy
+		-- Remove from active list & bob registry, then destroy.
 		for i, l in ipairs(activeLoot) do
 			if l == part then table.remove(activeLoot, i) break end
 		end
+		bobState[part] = nil
 		part:Destroy()
 	end)
 
@@ -129,25 +126,57 @@ end
 
 function LootSystem.cleanup()
 	for _, l in ipairs(activeLoot) do
+		bobState[l] = nil
 		if l.Parent then l:Destroy() end
 	end
 	activeLoot = {}
 end
 
--- Phase listener
-task.spawn(function()
-	while true do
-		task.wait(1)
-		local mm = _G.MatchManager
-		if mm then
-			if mm.CurrentPhase == GameConfig.PHASE.PVE and #activeLoot == 0 then
-				LootSystem.spawnLoot()
-			elseif mm.CurrentPhase == GameConfig.PHASE.LOBBY then
-				if #activeLoot > 0 then
-					LootSystem.cleanup()
-				end
-			end
+-- Central bob driver. One Heartbeat ticks every active pickup in one loop
+-- pass — was N coroutines × ~33Hz of task.wait(0.03) before. Phase offset
+-- per-pickup keeps the original "out of sync" wave look. Skips entries whose
+-- Part has been destroyed (defensive; should already be cleaned up by callers).
+local BOB_AMPLITUDE = 0.5  -- studs above/below StartY
+local BOB_SPEED = 1.66     -- radians/sec (was t += 0.05 every 0.03s ≈ 1.66 rad/s)
+local SPIN_DEG_PER_SEC = 50 -- rotation rate around Y
+RunService.Heartbeat:Connect(function(dt)
+	for part, state in pairs(bobState) do
+		if part.Parent then
+			state.Phase = state.Phase + BOB_SPEED * dt
+			local pos = part.Position
+			part.Position = Vector3.new(pos.X, state.StartY + math.sin(state.Phase) * BOB_AMPLITUDE, pos.Z)
+			local orient = part.Orientation
+			part.Orientation = Vector3.new(orient.X, (orient.Y + SPIN_DEG_PER_SEC * dt) % 360, orient.Z)
+		else
+			bobState[part] = nil
 		end
+	end
+end)
+
+-- React to phase changes via MatchManager.PhaseChangedServer (server-only
+-- BindableEvent). Replaces a 1Hz polling loop — loot now spawns instantly
+-- on PvE enter and clears immediately on LOBBY return.
+task.spawn(function()
+	local mm
+	for _ = 1, 50 do  -- ~5s max wait for MatchManager to register itself
+		mm = _G.MatchManager
+		if mm and mm.PhaseChangedServer then break end
+		task.wait(0.1)
+	end
+	if not mm or not mm.PhaseChangedServer then
+		warn("[LootSystem] MatchManager.PhaseChangedServer never appeared; loot won't spawn")
+		return
+	end
+	mm.PhaseChangedServer:Connect(function(phase)
+		if phase == GameConfig.PHASE.PVE and #activeLoot == 0 then
+			LootSystem.spawnLoot()
+		elseif phase == GameConfig.PHASE.LOBBY and #activeLoot > 0 then
+			LootSystem.cleanup()
+		end
+	end)
+	-- Edge case: connected after PvE already started → kick a spawn.
+	if mm.CurrentPhase == GameConfig.PHASE.PVE and #activeLoot == 0 then
+		LootSystem.spawnLoot()
 	end
 end)
 

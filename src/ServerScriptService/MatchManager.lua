@@ -30,6 +30,13 @@ MatchManager.MatchRunning = false
 MatchManager.EliminationOrder = {}  -- victims pushed in death order; placement = TotalPlayers - #order + 1
 MatchManager.TotalPlayers = 0       -- snapshot at startMatch for placement math
 
+-- Server-only phase event for sibling server scripts (NPCSystem / LootSystem)
+-- to react to phase changes without polling _G.MatchManager.CurrentPhase every
+-- second. Exposed on MatchManager so consumers can `:Connect` directly.
+local phaseChangedServer = Instance.new("BindableEvent")
+phaseChangedServer.Name = "PhaseChangedServer"
+MatchManager.PhaseChangedServer = phaseChangedServer.Event
+
 -- Player data store (per-match)
 local playerData = {}  -- [player] = { HP, Ammo, Coins, Weapon, Eliminated }
 
@@ -58,6 +65,7 @@ end
 function MatchManager.setPhase(phase)
 	MatchManager.CurrentPhase = phase
 	PhaseChanged:FireAllClients(phase)
+	phaseChangedServer:Fire(phase)  -- server-side fan-out for NPCSystem / LootSystem
 	-- Phases without an active countdown clear the timer label.
 	-- PvE / PvPWarning / PvP all push their own per-second TimerUpdate now (#19),
 	-- so only MATCH_END / LOBBY need the explicit zero clear.
