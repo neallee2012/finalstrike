@@ -288,9 +288,13 @@ function MatchManager.endMatch(winner)
 	-- Winner gets the placement-1 bonus (in addition to MatchComplete below).
 	-- Last-alive winners aren't pushed onto EliminationOrder, so the placement
 	-- math in eliminatePlayer skips them — we award PlacementWin explicitly here.
+	-- Plus FirstWinDaily if this is their first match win of the UTC day.
 	local rewards = GameConfig.ECONOMY.Rewards
 	if winner then
 		awardCoins(winner, rewards.PlacementWin, nil, "Match win")
+		if _G.DailyQuestService and rewards.FirstWinDaily then
+			_G.DailyQuestService.claimFirstWinDailyIfAvailable(winner, rewards.FirstWinDaily)
+		end
 	end
 
 	-- Match completion: everyone who was in the match (alive + eliminated) gets it.
@@ -476,6 +480,11 @@ local function setupLobbyTrigger()
 	end)
 end
 
+-- Anti-cheat: per-player last-fire timestamp for server-side rate limiting.
+-- Declared up here (before PlayerRemoving) so the cleanup closure can see it
+-- as an upvalue. Used by the FireWeapon handler below.
+local lastFireTick = {}  -- [player] = tick() at last accepted shot
+
 -- ============ PLAYER CONNECTIONS ============
 Players.PlayerRemoving:Connect(function(player)
 	if MatchManager.AlivePlayers[player] then
@@ -483,6 +492,7 @@ Players.PlayerRemoving:Connect(function(player)
 		playerData[player] = nil
 		MatchManager.checkWinCondition()
 	end
+	lastFireTick[player] = nil  -- don't leak Player keys
 end)
 
 -- Anti-cheat: max distance from a player's HumanoidRootPart that we'll accept
@@ -508,6 +518,18 @@ local function broadcastHitNearby(position, normal)
 	end
 end
 
+-- Anti-cheat helper: minimum allowed seconds between shots for this weapon.
+-- Client also gates with FireRate, but a tampered client could spam past it;
+-- the server enforces 90% of the declared FireRate (10% slack absorbs network
+-- jitter / client-server timing drift). FireRate of 0 (knives use AttackRate)
+-- and missing config skip the check.
+local function getMinFireInterval(config)
+	-- Knives use AttackRate; ranged weapons use FireRate. Both are seconds-per-shot.
+	local rate = config.FireRate or config.AttackRate
+	if not rate or rate <= 0 then return 0 end
+	return rate * 0.9  -- 10% grace for jitter
+end
+
 -- Handle weapon fire from client
 events:WaitForChild("FireWeapon").OnServerEvent:Connect(function(player, origin, direction, weaponName)
 	local data = playerData[player]
@@ -519,6 +541,18 @@ events:WaitForChild("FireWeapon").OnServerEvent:Connect(function(player, origin,
 
 	local config = GameConfig.WEAPONS[weaponName]
 	if not config then return end
+
+	-- Anti-cheat: server-side fire-rate limit. Reject calls faster than the
+	-- weapon's declared rate (with 10% slack for jitter). Without this, an
+	-- auto-clicker / packet-spammer can multiply DPS by spamming the RemoteEvent
+	-- past the client's local FireRate gate.
+	local minInterval = getMinFireInterval(config)
+	if minInterval > 0 then
+		local now = tick()
+		local last = lastFireTick[player] or 0
+		if now - last < minInterval then return end
+		lastFireTick[player] = now
+	end
 
 	-- Anti-cheat: validate the client-supplied origin and direction (Issue 2).
 	-- A naive exploit is to send an origin near a target so any direction is a

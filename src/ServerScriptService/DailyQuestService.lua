@@ -132,6 +132,27 @@ function DailyQuestService.recordEvent(player, eventType, count)
 	if changed then pushUpdate(player) end
 end
 
+-- One-shot reward for the day's first match win, awarded on top of PlacementWin
+-- (called from MatchManager.endMatch when there's a winner). Reuses the Claimed
+-- table with a sentinel key so the UTC-midnight rollover in ensureFreshDay
+-- automatically clears it for the next day. Returns the amount paid (0 if
+-- already claimed today or no winner / no service).
+local FIRST_WIN_KEY = "firstWinDaily"
+
+function DailyQuestService.claimFirstWinDailyIfAvailable(player, rewardAmount)
+	local entry = data[player]
+	if not entry or not rewardAmount or rewardAmount <= 0 then return 0 end
+	ensureFreshDay(entry)
+	if entry.Claimed[FIRST_WIN_KEY] then return 0 end  -- already claimed today
+	if not _G.CurrencyService or not _G.CurrencyService.addDailyReward then return 0 end
+
+	_G.CurrencyService.addDailyReward(player, rewardAmount, "First win of the day")
+	entry.Claimed[FIRST_WIN_KEY] = true
+	pushUpdate(player)
+	print(string.format("[DailyQuest] %s first-win-of-day bonus +%d coins", player.Name, rewardAmount))
+	return rewardAmount
+end
+
 -- Try to claim a quest reward. Returns success: bool, reason: string
 -- Reasons: "ok" / "unknown" (bad questId) / "incomplete" / "claimed" / "noservice"
 function DailyQuestService.tryClaim(player, questId)
