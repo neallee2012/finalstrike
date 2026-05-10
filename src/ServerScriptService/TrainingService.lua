@@ -224,7 +224,44 @@ Players.PlayerRemoving:Connect(function(player)
 	lastExitTick[player] = nil
 end)
 
--- (#37) On real-match start, sweep stale training state defensively.
+-- (#37 round 3) The flag was getting stuck at true when a player died inside
+-- the training arena (live NPCs can kill them) — Roblox respawns them at
+-- LobbySpawn but the flag never cleared, so the next portal touch hit the
+-- "already inTraining" reject. Clear the flag in two places: on Humanoid.Died,
+-- and on CharacterAdded if the new character spawns outside the training
+-- arena bounds. CharacterAdded covers any other respawn path (manual reset,
+-- LoadCharacter from MatchManager, etc).
+local TRAINING_CENTER = Vector3.new(500, 0, 0)
+local TRAINING_RADIUS = 100   -- training floor is 120x120, so 70-80 fits comfortably
+
+local function clearStale(player, reason)
+	if inTraining[player] then
+		inTraining[player] = nil
+		lastEnterTick[player] = nil
+		print(string.format("[TrainingService] cleared inTraining for %s (%s)", player.Name, reason))
+	end
+end
+
+local function attachCharHooks(player)
+	local function onCharAdded(char)
+		local hum = char:WaitForChild("Humanoid", 5)
+		if hum then
+			hum.Died:Connect(function() clearStale(player, "Humanoid.Died") end)
+		end
+		-- After spawn settles, check if character is outside training bounds.
+		task.wait(0.3)
+		local hrp = char:FindFirstChild("HumanoidRootPart")
+		if hrp and (hrp.Position - TRAINING_CENTER).Magnitude > TRAINING_RADIUS then
+			clearStale(player, "respawn outside training")
+		end
+	end
+	if player.Character then task.spawn(onCharAdded, player.Character) end
+	player.CharacterAdded:Connect(onCharAdded)
+end
+for _, p in ipairs(Players:GetPlayers()) do attachCharHooks(p) end
+Players.PlayerAdded:Connect(attachCharHooks)
+
+-- On real-match start, sweep stale training state defensively.
 task.spawn(function()
 	local mm
 	for _ = 1, 50 do
