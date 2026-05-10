@@ -66,7 +66,10 @@ local function createPickup(lootType, position)
 
 		if lootType == "Ammo" then
 			data.Ammo = data.Ammo + GameConfig.LOOT.Ammo.Amount
-			events.AmmoUpdate:FireClient(player, data.Ammo, 30)
+			-- AmmoUpdate max should reflect equipped weapon's MagSize, not a hardcoded 30 (Issue 4).
+			local weaponCfg = GameConfig.WEAPONS[data.Weapon]
+			local maxAmmo = (weaponCfg and weaponCfg.MagSize) or data.Ammo
+			events.AmmoUpdate:FireClient(player, data.Ammo, maxAmmo)
 		elseif lootType == "MedkitSmall" or lootType == "Medkit"
 		    or lootType == "MedkitLarge" or lootType == "MedkitFull" then
 			-- Sprint 8b: 4-tier medkit; heal amount lookup from GameConfig.LOOT[tier].Heal
@@ -75,7 +78,11 @@ local function createPickup(lootType, position)
 				mm.healPlayer(player, entry.Heal)
 			end
 		elseif lootType == "Coin" then
-			data.Coins = data.Coins + GameConfig.LOOT.Coin.Amount
+			-- Award persistent BulletCoins via CurrencyService (Issue 3 fix —
+			-- previously a dead-state per-match counter that nothing read).
+			if _G.CurrencyService then
+				_G.CurrencyService.addCoins(player, GameConfig.LOOT.Coin.Amount, "NpcKills")
+			end
 		end
 
 		-- Quest progress: any loot pickup counts toward "拾取 5 個戰利品"

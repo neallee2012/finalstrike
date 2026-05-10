@@ -205,22 +205,25 @@ local function makeCard(weapon)
 	buyBtn.Font = Enum.Font.GothamBold
 	buyBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 50)
 	buyBtn.AutoButtonColor = true
+	buyBtn:SetAttribute("Action", "buy")  -- one of: "buy" | "equip" | "equipped" | "broke"
 	local bc = Instance.new("UICorner") bc.CornerRadius = UDim.new(0, 4) bc.Parent = buyBtn
 	buyBtn.Parent = card
 
-	-- Single button serves three states (BUY / EQUIP / inactive). Action depends
-	-- on current text — refreshCards() updates text+color when state changes.
+	-- Click handler dispatches off the Action attribute (set by refreshCards),
+	-- not the UI text — so localizing or restyling the label can't silently
+	-- break behavior (Issue 6).
 	buyBtn.MouseButton1Click:Connect(function()
-		if buyBtn.Text == "BUY" then
+		local action = buyBtn:GetAttribute("Action")
+		if action == "buy" then
 			events.BuyWeapon:FireServer(weapon.Name)
 			statusLabel.Text = "Buying " .. weapon.Name .. "..."
 			statusLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-		elseif buyBtn.Text == "EQUIP" then
+		elseif action == "equip" then
 			events.EquipPrimaryWeapon:FireServer(weapon.Name)
 			statusLabel.Text = "Equipped " .. weapon.Name .. " as primary"
 			statusLabel.TextColor3 = Color3.fromRGB(80, 220, 100)
 		end
-		-- TOO POOR / EQUIPPED: no-op (server would reject anyway)
+		-- "equipped" / "broke": no-op (server would reject anyway)
 	end)
 
 	cards[weapon.Name] = { Frame = card, BuyBtn = buyBtn }
@@ -232,19 +235,23 @@ local function refreshCards()
 		local cfg = GameConfig.WEAPONS[name]
 		if owned[name] then
 			if name == primaryWeapon then
+				card.BuyBtn:SetAttribute("Action", "equipped")
 				card.BuyBtn.Text = "EQUIPPED"
 				card.BuyBtn.BackgroundColor3 = Color3.fromRGB(40, 140, 70)
 				card.BuyBtn.AutoButtonColor = false
 			else
+				card.BuyBtn:SetAttribute("Action", "equip")
 				card.BuyBtn.Text = "EQUIP"
 				card.BuyBtn.BackgroundColor3 = Color3.fromRGB(50, 90, 140)
 				card.BuyBtn.AutoButtonColor = true
 			end
 		elseif coins < cfg.Price then
+			card.BuyBtn:SetAttribute("Action", "broke")
 			card.BuyBtn.Text = "TOO POOR"
 			card.BuyBtn.BackgroundColor3 = Color3.fromRGB(80, 50, 50)
 			card.BuyBtn.AutoButtonColor = false
 		else
+			card.BuyBtn:SetAttribute("Action", "buy")
 			card.BuyBtn.Text = "BUY"
 			card.BuyBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 50)
 			card.BuyBtn.AutoButtonColor = true

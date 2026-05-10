@@ -70,25 +70,16 @@ end
 function MatchManager.initPlayerData(player)
 	-- Use player's chosen primary weapon (from shop equip) — fallback to STARTER_WEAPONS
 	-- if ShopService isn't loaded or hasn't loaded the player yet.
-	local defaultWeapon = GameConfig.STARTER_WEAPONS[1]
-	local equipped = (_G.ShopService and _G.ShopService.getPrimary(player)) or defaultWeapon
-	if not GameConfig.WEAPONS[equipped] then
-		equipped = defaultWeapon
-	end
-	if not GameConfig.WEAPONS[equipped] then
-		equipped = next(GameConfig.WEAPONS)
-		warn("[MatchManager] STARTER_WEAPONS[1] is invalid; falling back to " .. tostring(equipped))
-	end
-	local equippedCfg = GameConfig.WEAPONS[equipped]
-	if not equippedCfg then
-		error("[MatchManager] No valid weapons configured")
-	end
+	local equipped = (_G.ShopService and _G.ShopService.getPrimary(player)) or GameConfig.STARTER_WEAPONS[1]
+	local equippedCfg = GameConfig.WEAPONS[equipped] or GameConfig.WEAPONS[GameConfig.STARTER_WEAPONS[1]]
 
+	-- Start each player with a full magazine of their equipped weapon (Issue 4).
+	-- Knives have no MagSize, so we fall back to 0 (knives ignore Ammo anyway).
+	local startingAmmo = equippedCfg.MagSize or 0
 	playerData[player] = {
 		HP = GameConfig.MAX_HP,
 		MaxHP = GameConfig.MAX_HP,
-		Ammo = 30,
-		Coins = 0,
+		Ammo = startingAmmo,
 		Weapon = equipped,
 		Eliminated = false,
 		ProtectedUntil = 0,  -- set after teleportToArena
@@ -97,8 +88,7 @@ function MatchManager.initPlayerData(player)
 	local healthUpdate = events:WaitForChild("HealthUpdate")
 	healthUpdate:FireClient(player, GameConfig.MAX_HP, GameConfig.MAX_HP)
 	local ammoUpdate = events:WaitForChild("AmmoUpdate")
-	ammoUpdate:FireClient(player, 30, equippedCfg.MagSize or 30)
-	events:WaitForChild("EquipWeapon"):FireClient(player, equipped)
+	ammoUpdate:FireClient(player, startingAmmo, startingAmmo)
 end
 
 -- Build a weapon Tool and parent it to the player's Character so Roblox's
@@ -117,7 +107,20 @@ function MatchManager.attachWeapon(player, weaponName)
 	end
 
 	local tool = WeaponMeshes.build(weaponName)
-	if not tool then return end
+	if not tool then
+		-- Weapon was removed from GameConfig (or builder Type missing). Fall back
+		-- to the starter weapon so the player isn't left empty-handed. Avoid
+		-- infinite recursion by only retrying if the fallback is different.
+		local fallback = GameConfig.STARTER_WEAPONS[1]
+		if fallback and fallback ~= weaponName then
+			warn(string.format("[MatchManager] No mesh for %s; falling back to %s", weaponName, fallback))
+			-- Update server-side weapon record so subsequent fire/reload paths use the fallback
+			local data = playerData[player]
+			if data then data.Weapon = fallback end
+			tool = WeaponMeshes.build(fallback)
+		end
+		if not tool then return end
+	end
 
 	-- Parenting Tool directly to Character auto-equips it (skipping Backpack)
 	-- and triggers the engine's grip + tool-hold animation.
@@ -478,14 +481,50 @@ Players.PlayerRemoving:Connect(function(player)
 	end
 end)
 
+-- Anti-cheat: max distance from a player's HumanoidRootPart that we'll accept
+-- as a "muzzle origin" for FireWeapon (Issue 2). Generous enough to cover any
+-- weapon's handle-to-muzzle offset (longest is the Wraith sniper at ~4 studs)
+-- plus normal client-server position desync, but far smaller than the map. A
+-- cheating client trying to teleport-shoot has to first move their character close.
+local MAX_FIRE_ORIGIN_DIST = 10
+
+-- WeaponHit broadcast radius (Issue 7) — only clients with a character within
+-- this distance of the impact point receive the hit-spark VFX. Cuts peak
+-- network traffic during PvP without affecting gameplay.
+local WEAPON_HIT_BROADCAST_DIST = 80
+
+-- Send WeaponHit to nearby players only (Issue 7: distance filter).
+local function broadcastHitNearby(position, normal)
+	for _, p in ipairs(Players:GetPlayers()) do
+		local char = p.Character
+		local root = char and char:FindFirstChild("HumanoidRootPart")
+		if root and (root.Position - position).Magnitude <= WEAPON_HIT_BROADCAST_DIST then
+			events.WeaponHit:FireClient(p, position, normal)
+		end
+	end
+end
+
 -- Handle weapon fire from client
 events:WaitForChild("FireWeapon").OnServerEvent:Connect(function(player, origin, direction, weaponName)
 	local data = playerData[player]
 	if not data or data.Eliminated then return end
-	if weaponName ~= data.Weapon then return end
 
 	local config = GameConfig.WEAPONS[weaponName]
 	if not config then return end
+
+	-- Anti-cheat: validate the client-supplied origin and direction (Issue 2).
+	-- A naive exploit is to send an origin near a target so any direction is a
+	-- guaranteed hit. We reject origins too far from the player's HumanoidRootPart
+	-- and direction vectors that aren't real Vector3s.
+	if typeof(origin) ~= "Vector3" or typeof(direction) ~= "Vector3" then return end
+	if direction.Magnitude < 0.001 then return end
+	local char = player.Character
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+	if (origin - root.Position).Magnitude > MAX_FIRE_ORIGIN_DIST then
+		warn(string.format("[FireWeapon] %s rejected: origin %.1f studs from HRP (max %d)", player.Name, (origin - root.Position).Magnitude, MAX_FIRE_ORIGIN_DIST))
+		return
+	end
 
 	-- Ammo check
 	if config.Type ~= "Knife" then
@@ -551,8 +590,9 @@ events:WaitForChild("FireWeapon").OnServerEvent:Connect(function(player, origin,
 				end
 			end
 
-			-- Generic hit spark (also fires for non-Humanoid hits like cover)
-			events.WeaponHit:FireAllClients(result.Position, result.Normal)
+			-- Generic hit spark (also fires for non-Humanoid hits like cover).
+			-- Only nearby players see it (Issue 7: cuts peak PvP traffic ~70%).
+			broadcastHitNearby(result.Position, result.Normal)
 		end
 	end
 end)

@@ -263,7 +263,10 @@ local function dropLoot(npcModel)
 
 				if lootType == "Ammo" then
 					data.Ammo = data.Ammo + GameConfig.LOOT.Ammo.Amount
-					events.AmmoUpdate:FireClient(player, data.Ammo, 30)
+					-- AmmoUpdate max from equipped MagSize, not hardcoded 30 (Issue 4).
+					local weaponCfg = GameConfig.WEAPONS[data.Weapon]
+					local maxAmmo = (weaponCfg and weaponCfg.MagSize) or data.Ammo
+					events.AmmoUpdate:FireClient(player, data.Ammo, maxAmmo)
 				elseif lootType == "MedkitSmall" or lootType == "Medkit"
 				    or lootType == "MedkitLarge" or lootType == "MedkitFull" then
 					-- Sprint 8b: 4-tier medkit; heal amount lookup
@@ -272,7 +275,10 @@ local function dropLoot(npcModel)
 						mm.healPlayer(player, entry.Heal)
 					end
 				elseif lootType == "Coin" then
-					data.Coins = data.Coins + GameConfig.LOOT.Coin.Amount
+					-- Issue 3 fix: award persistent BulletCoins instead of dead per-match counter.
+					if _G.CurrencyService then
+						_G.CurrencyService.addCoins(player, GameConfig.LOOT.Coin.Amount, "NpcKills")
+					end
 				end
 
 				events.LootPickedUp:FireClient(player, lootType, lootType == "Coin" and GameConfig.LOOT.Coin.Amount or 1)

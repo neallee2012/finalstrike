@@ -1,7 +1,5 @@
--- GameEventsBootstrap.lua (ServerScriptService)
--- Creates the ReplicatedStorage.GameEvents Folder + RemoteEvents at server startup.
--- Bootstrap script lives in ServerScriptService (not ReplicatedStorage) so it auto-runs
--- under default RunContext, and its name doesn't collide with the Folder it creates.
+-- GameEvents.lua (ReplicatedStorage)
+-- Remote events and functions for client-server communication
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
