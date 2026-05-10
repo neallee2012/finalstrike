@@ -639,7 +639,10 @@ function MAP.upgradeLobbyVisuals(lobby)
 		addLight(strip, Color3.fromRGB(255, 60, 50), 1.5, 30)
 	end
 	local bannerGui = Instance.new("SurfaceGui")
-	bannerGui.Face = Enum.NormalId.Back
+	-- (#41) Face=Front (-Z) so the GUI faces the spawn at z=-10. The original
+	-- comment incorrectly labeled NormalId.Back as the -Z face; Back is +Z
+	-- (away from spawn) so the text was rendered on the unseen far side.
+	bannerGui.Face = Enum.NormalId.Front
 	bannerGui.LightInfluence = 0
 	bannerGui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
 	bannerGui.PixelsPerStud = 50
