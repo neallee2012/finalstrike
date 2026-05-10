@@ -144,7 +144,7 @@ GameConfig.ENEMIES = {
 		Damage = 18, -- was 10
 		Speed = 12,
 		DetectRange = 40,
-		AttackRange = 6,
+		AttackRange = 9,    -- issue #24: was 6 (≈1.8m); now ~2.7m so NPCs engage at the spec'd 3m
 		AttackRate = 1.0,
 		LootTable = { Ammo = 0.50, MedkitSmall = 0.25, Coin = 0.20 },
 		Color = Color3.fromRGB(120, 120, 120),
@@ -154,7 +154,7 @@ GameConfig.ENEMIES = {
 		Damage = 28, -- was 15
 		Speed = 8,
 		DetectRange = 35,
-		AttackRange = 7,
+		AttackRange = 10,   -- issue #24: was 7 (≈2.1m); now ~3m
 		AttackRate = 1.5,
 		LootTable = { Ammo = 0.50, Medkit = 0.35, Coin = 0.35 },
 		Color = Color3.fromRGB(80, 80, 100),
@@ -164,7 +164,7 @@ GameConfig.ENEMIES = {
 		Damage = 40, -- was 25
 		Speed = 14,
 		DetectRange = 50,
-		AttackRange = 8,
+		AttackRange = 11,   -- issue #24: was 8 (≈2.4m); Elite gets longest reach ~3.3m
 		AttackRate = 0.8,
 		LootTable = { Ammo = 0.40, MedkitLarge = 0.50, MedkitFull = 0.05, Coin = 0.50 },
 		Color = Color3.fromRGB(180, 40, 40),
