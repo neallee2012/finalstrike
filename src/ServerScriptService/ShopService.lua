@@ -25,6 +25,11 @@ local primaryStore = DataStoreService:GetDataStore("PlayerPrimaryWeapon_v1")
 local owned = {}    -- [player] = { [weaponName] = true, ... }  (set, not list)
 local primary = {}  -- [player] = weaponName  (currently equipped main weapon)
 
+-- [player] = true once owned-weapons GetAsync succeeded. savePlayer is gated on
+-- this so a failed load never overwrites the player's real saved ownership with
+-- starter-only defaults. (Primary store has its own narrow guard below.)
+local loaded = {}
+
 local function newDefaultOwnership()
 	local set = {}
 	for _, name in ipairs(GameConfig.STARTER_WEAPONS) do
@@ -66,6 +71,7 @@ local function loadPlayer(player)
 				end
 			end
 		end
+		loaded[player] = true
 	else
 		warn("[ShopService] Load failed for " .. player.Name .. ": " .. tostring(result))
 	end
@@ -91,6 +97,12 @@ end
 local function savePlayer(player)
 	local set = owned[player]
 	if not set then return end
+	if not loaded[player] then
+		-- Load failed; `set` is starter-only default. Writing it would wipe the
+		-- player's real owned weapons. Skip both stores.
+		warn("[ShopService] Skipping save for " .. player.Name .. " (load never succeeded)")
+		return
+	end
 	local ok, err = pcall(function()
 		store:SetAsync(tostring(player.UserId), setToSortedList(set))
 	end)
@@ -188,6 +200,7 @@ Players.PlayerRemoving:Connect(function(player)
 	savePlayer(player)
 	owned[player] = nil
 	primary[player] = nil
+	loaded[player] = nil
 end)
 
 game:BindToClose(function()

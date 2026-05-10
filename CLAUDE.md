@@ -93,17 +93,21 @@ PvE 蒐集階段 (180秒) → PvP 淘汰賽 → 最後存活者獲勝。
 ## 腳本位置對照表
 | 腳本 | Service | 類型 | 職責 |
 |---|---|---|---|
-| MatchManager | ServerScriptService | Script | 比賽流程核心 |
-| NPCSystem | ServerScriptService | Script | NPC 生成 + AI |
+| MatchManager | ServerScriptService | Script | 比賽流程核心 + 玩家 HP/Ammo + FireWeapon raycast |
+| NPCSystem | ServerScriptService | Script | NPC 生成 + AI + 戰利品掉落 |
 | LootSystem | ServerScriptService | Script | 戰利品生成拾取 |
-| PlayerHealth | ServerScriptService | ModuleScript | 血量 API |
+| CurrencyService | ServerScriptService | Script | BulletCoin 持久化 + 每場上限 |
+| ShopService | ServerScriptService | Script | 武器持有 + 購買 + 主武器選擇 |
+| DailyQuestService | ServerScriptService | Script | 每日任務進度 + 領取 (UTC 重置) |
 | MapBuilder | ServerScriptService | Script | 地圖生成 |
 | GameEventsBootstrap | ServerScriptService | Script | runtime 建立 ReplicatedStorage.GameEvents Folder + RemoteEvents |
-| GameConfig | ReplicatedStorage | ModuleScript | 全域設定 |
+| GameConfig | ReplicatedStorage | ModuleScript | 全域設定 (武器/敵人/經濟/任務) |
 | GameEvents | ReplicatedStorage | Folder (runtime) | 由 GameEventsBootstrap 建立，內含所有 RemoteEvent |
-| WeaponSystem | ServerStorage | ModuleScript | 武器數據 |
-| HUDController | StarterPlayerScripts | LocalScript | UI（放此處避免每次重生 clone 一份新 ScreenGui，issue #2）|
-| WeaponClient | StarterPlayerScripts | LocalScript | 射擊輸入 |
+| WeaponMeshes | ServerStorage | ModuleScript | 武器 3D 模型生成 (6 builders × 30 武器) |
+| HUDController | StarterPlayerScripts | LocalScript | HUD（HP/Ammo/Phase/Currency/KillFeed，放此處避免每次重生 clone 一份新 ScreenGui，issue #2）|
+| WeaponClient | StarterPlayerScripts | LocalScript | 射擊輸入 + 兩段瞄準 (#8) |
+| ShopController | StarterPlayerScripts | LocalScript | B 鍵開店 UI |
+| DailyQuestUI | StarterPlayerScripts | LocalScript | Q 鍵每日任務 UI |
 
 ## 比賽階段
 1. Lobby — 等待玩家，踩啟動台開始
