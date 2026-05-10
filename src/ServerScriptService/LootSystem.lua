@@ -54,8 +54,12 @@ local function createPickup(lootType, position)
 		end
 	end)
 
-	-- Pickup on touch
+	-- Pickup on touch. `consumed` guards idempotency — Roblox fires Touched
+	-- once per character part that intersects (head, torso, legs, arms…) so a
+	-- single pickup would otherwise pay out 6× before Destroy propagates.
+	local consumed = false
 	part.Touched:Connect(function(hit)
+		if consumed then return end
 		local player = Players:GetPlayerFromCharacter(hit.Parent)
 		if not player then return end
 
@@ -63,6 +67,8 @@ local function createPickup(lootType, position)
 		if not mm then return end
 		local data = mm.getPlayerData(player)
 		if not data or data.Eliminated then return end
+
+		consumed = true
 
 		if lootType == "Ammo" then
 			data.Ammo = data.Ammo + GameConfig.LOOT.Ammo.Amount

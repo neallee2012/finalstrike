@@ -251,8 +251,13 @@ local function dropLoot(npcModel)
 
 			loot.Parent = workspace
 
-			-- Pickup logic
+			-- Pickup logic. `consumed` guards against Touched firing once per
+			-- character part (Roblox fires it for head, torso, legs, arms…),
+			-- which would otherwise pay out the pickup 6× before Destroy
+			-- propagates.
+			local consumed = false
 			loot.Touched:Connect(function(hit)
+				if consumed then return end
 				local player = Players:GetPlayerFromCharacter(hit.Parent)
 				if not player then return end
 
@@ -260,6 +265,8 @@ local function dropLoot(npcModel)
 				if not mm then return end
 				local data = mm.getPlayerData(player)
 				if not data or data.Eliminated then return end
+
+				consumed = true
 
 				if lootType == "Ammo" then
 					data.Ammo = data.Ammo + GameConfig.LOOT.Ammo.Amount
@@ -342,10 +349,13 @@ local function runNPCAI(npcModel)
 		end
 	end
 
-	-- Listen for HP changes (damage from weapons)
+	-- Listen for HP changes (damage from weapons). Guard against re-firing
+	-- death after the first 0-or-below HP write — rapid follow-up shots can
+	-- drive HP further negative and re-enter this branch, dropping loot
+	-- multiple times and double-paying the kill bounty.
 	npcModel:GetAttributeChangedSignal("HP"):Connect(function()
 		local hp = npcModel:GetAttribute("HP")
-		if hp <= 0 then
+		if hp <= 0 and npcModel:GetAttribute("State") ~= "Dead" then
 			npcModel:SetAttribute("State", "Dead")
 			dropLoot(npcModel)
 
