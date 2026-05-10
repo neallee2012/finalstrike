@@ -332,6 +332,16 @@ events:WaitForChild("PhaseChanged").OnClientEvent:Connect(function(phase)
 	else
 		phaseLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 	end
+
+	-- (#40) Client-side timer guarantee: when phase is Lobby or MatchEnd,
+	-- clear the timer text immediately. The server fires TimerUpdate(0) on
+	-- these phases, but a server PvP-loop race (one final non-zero
+	-- TimerUpdate fired in-flight before MatchRunning=false stopped the
+	-- loop) could land at the client AFTER the zero. Clearing here on
+	-- phase-change is the authoritative "no countdown active" signal.
+	if phase == "Lobby" or phase == "MatchEnd" then
+		timerLabel.Text = ""
+	end
 end)
 
 events:WaitForChild("TimerUpdate").OnClientEvent:Connect(function(seconds)

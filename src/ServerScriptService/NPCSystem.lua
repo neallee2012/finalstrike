@@ -545,19 +545,16 @@ function NPCSystem.spawnDummyAt(marker)
 	local npc = createR15NPC(enemyType, marker.Position)
 	if not npc then return end
 	npc:SetAttribute("IsTrainingDummy", true)
-	-- Pin the dummy in place: anchor the HumanoidRootPart so it doesn't
-	-- respond to physics (it'll still ragdoll on death briefly but won't
-	-- wander). Humanoid:MoveTo isn't called from any AI loop on dummies.
-	local hrp = npc:FindFirstChild("HumanoidRootPart")
-	if hrp then hrp.Anchored = true end
-	-- Disable the Animate LocalScript's idle animation so the dummy stands
-	-- perfectly still (otherwise the default R15 idle bob runs).
-	local animate = npc:FindFirstChild("Animate")
-	if animate then animate.Disabled = true end
+	-- (#33) Training dummies now move + shoot. Was anchored static targets;
+	-- CEO requested mobile combat so practice is meaningful. We run the same
+	-- runNPCAI used for match NPCs — it patrols / chases / attacks the
+	-- nearest non-eliminated player. The player's invincibility in training
+	-- is enforced server-side in MatchManager.damagePlayer (skip damage when
+	-- TrainingService.isInTraining(player) is true).
 	npc.Parent = workspace
 	table.insert(activeDummies, npc)
 	watchDummy(npc, marker)
-	-- NOTE: deliberately do NOT spawn runNPCAI on dummies.
+	task.spawn(runNPCAI, npc)
 end
 
 -- Spawn all dummies from TrainingArena.DummySpawns markers. Idempotent: if

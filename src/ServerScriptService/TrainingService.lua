@@ -92,6 +92,14 @@ local function onExitTouched(hit)
 		return
 	end
 
+	-- Destroy any equipped Tool before teleport — lobby is gun-less per #38.
+	local char = player.Character
+	if char then
+		for _, c in ipairs(char:GetChildren()) do
+			if c:IsA("Tool") then c:Destroy() end
+		end
+	end
+
 	if not teleportPlayerTo(player, lobbySpawn.Position) then return end
 	inTraining[player] = nil
 	events.ExitTrainingArena:FireClient(player)
@@ -158,6 +166,36 @@ Players.PlayerRemoving:Connect(function(player)
 	lastEnterTick[player] = nil
 	lastExitTick[player] = nil
 end)
+
+-- (#37) On real-match start, clear any stale inTraining flags. Without this,
+-- a player who somehow ends up flagged as inTraining (race condition, edge
+-- case I haven't fully traced) could find the portal silently rejecting
+-- subsequent entries because the entry guard checks `inTraining[player]`.
+-- Connecting to PhaseChangedServer keeps the cleanup tied to the phase
+-- machine rather than scattering state-reset logic.
+task.spawn(function()
+	local mm
+	for _ = 1, 50 do
+		mm = _G.MatchManager
+		if mm and mm.PhaseChangedServer then break end
+		task.wait(0.1)
+	end
+	if not mm or not mm.PhaseChangedServer then return end
+	mm.PhaseChangedServer:Connect(function(phase)
+		if phase == "PvE" then  -- match just started; sweep stale training state
+			for player in pairs(inTraining) do
+				inTraining[player] = nil
+				lastEnterTick[player] = nil
+			end
+		end
+	end)
+end)
+
+-- Public query for other server scripts (e.g., MatchManager.damagePlayer
+-- skips damage when player is in training — issue #33 invincibility).
+function TrainingService.isInTraining(player)
+	return inTraining[player] == true
+end
 
 _G.TrainingService = TrainingService
 return TrainingService

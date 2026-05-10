@@ -140,9 +140,20 @@ function MatchManager.attachWeapon(player, weaponName)
 end
 
 -- Hook respawn so the weapon re-attaches on the new Character.
+-- Phase guard (#35 / #38): only re-attach during ARENA phases. Lobby /
+-- MatchEnd respawns must NOT carry a weapon — players hang out in the lobby
+-- without guns. Without this guard, a death → respawn during the brief
+-- window before resetToLobby clears playerData would hand the weapon back.
+local ARENA_PHASES = {
+	[GameConfig.PHASE.PVE] = true,
+	[GameConfig.PHASE.PVP_WARNING] = true,
+	[GameConfig.PHASE.PVP] = true,
+}
+
 local function bindRespawnHook(player)
 	player.CharacterAdded:Connect(function()
 		task.wait(0.5)  -- let R15 rig finish loading
+		if not ARENA_PHASES[MatchManager.CurrentPhase] then return end
 		local data = playerData[player]
 		if data and not data.Eliminated and data.Weapon then
 			MatchManager.attachWeapon(player, data.Weapon)
@@ -155,6 +166,12 @@ for _, p in ipairs(Players:GetPlayers()) do bindRespawnHook(p) end
 function MatchManager.damagePlayer(player, damage, attacker)
 	local data = playerData[player]
 	if not data or data.Eliminated then return end
+
+	-- (#33) Player is invincible while in the training arena. Training NPCs
+	-- still chase, shoot, and animate, but no damage applies — the practice
+	-- is about aim and movement, not survival. Outside training this guard
+	-- is a fast no-op via the inTraining[player] hash lookup.
+	if _G.TrainingService and _G.TrainingService.isInTraining(player) then return end
 
 	local isPlayerAttacker = attacker and attacker:IsA("Player")
 
@@ -236,6 +253,10 @@ function MatchManager.eliminatePlayer(player, killer)
 				and workspace.LastZone.SpectatorArea:FindFirstChild("SpectatorSpawn")
 			if specSpawn then
 				player.Character.HumanoidRootPart.CFrame = specSpawn.CFrame + Vector3.new(0, 3, 0)
+			end
+			-- Defensive Tool destroy (#35) — spectator respawn must be weaponless
+			for _, c in ipairs(player.Character:GetChildren()) do
+				if c:IsA("Tool") then c:Destroy() end
 			end
 		end
 		-- Respawn them in spectator
@@ -331,6 +352,19 @@ function MatchManager.resetToLobby()
 	MatchManager.AlivePlayers = {}
 	MatchManager.PvPEnabled = false
 	playerData = {}
+
+	-- Defensive Tool destroy (#35 / #38): even though LoadCharacter destroys
+	-- the existing character (and its Tool with it), some Roblox versions
+	-- can race here. Explicitly destroying any equipped Tool first guarantees
+	-- the lobby spawn is gun-less.
+	for _, player in ipairs(Players:GetPlayers()) do
+		local char = player.Character
+		if char then
+			for _, c in ipairs(char:GetChildren()) do
+				if c:IsA("Tool") then c:Destroy() end
+			end
+		end
+	end
 
 	-- Teleport all players to lobby + reset HUD HP back to full (#18) so the
 	-- HP bar doesn't keep showing whatever it was at when the match ended.
