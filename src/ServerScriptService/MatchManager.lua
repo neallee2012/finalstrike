@@ -84,11 +84,15 @@ function MatchManager.initPlayerData(player)
 		Eliminated = false,
 		ProtectedUntil = 0,  -- set after teleportToArena
 	}
-	-- Send initial HP + ammo
+	-- Send initial HP + ammo + equipped weapon. WeaponClient relies on
+	-- EquipWeapon to update its `currentWeapon`; without it the client
+	-- keeps STARTER_WEAPONS[1] as the assumed weapon and uses wrong
+	-- Range/FireRate/Auto stats client-side.
 	local healthUpdate = events:WaitForChild("HealthUpdate")
 	healthUpdate:FireClient(player, GameConfig.MAX_HP, GameConfig.MAX_HP)
 	local ammoUpdate = events:WaitForChild("AmmoUpdate")
 	ammoUpdate:FireClient(player, startingAmmo, startingAmmo)
+	events:WaitForChild("EquipWeapon"):FireClient(player, equipped)
 end
 
 -- Build a weapon Tool and parent it to the player's Character so Roblox's
@@ -508,6 +512,10 @@ end
 events:WaitForChild("FireWeapon").OnServerEvent:Connect(function(player, origin, direction, weaponName)
 	local data = playerData[player]
 	if not data or data.Eliminated then return end
+	-- Anti-spoof: client must fire with their currently-equipped weapon name.
+	-- Without this, a malicious client could pass any weapon (incl. unowned
+	-- Demon-tier) and the server would use that weapon's stats for the raycast.
+	if weaponName ~= data.Weapon then return end
 
 	local config = GameConfig.WEAPONS[weaponName]
 	if not config then return end

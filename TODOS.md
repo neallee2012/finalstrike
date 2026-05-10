@@ -123,3 +123,18 @@ Each entry: **What / Why / Pros / Cons / Context / Depends on**.
 - **Cons (don't cap):** Saved progress numbers grow without bound.
 - **Context:** PR #7 introduces this. Acceptable as-is for a single quest cycle but bites if you ever raise targets retroactively.
 - **Depends on:** Nothing.
+
+---
+
+## Fixed inline (no longer deferred)
+
+Bugs flagged during PR #7 eng-review Studio playtest, fixed in the same PR
+(see `fix: NPC death listener and loot Touched are now idempotent`):
+
+- **NPC HP attribute listener fired N times on each death** — fixed with
+  `if hp <= 0 and State ~= "Dead"` guard so rapid follow-up shots after
+  death don't re-enter the death branch (was paying the kill bounty 5×
+  and dropping loot 5×).
+- **Loot pickup Touched fired per character part** — fixed with per-pickup
+  `consumed` flag in both `LootSystem.createPickup` and `NPCSystem.dropLoot`,
+  so a single coin no longer awards 6× currency before Destroy propagates.
