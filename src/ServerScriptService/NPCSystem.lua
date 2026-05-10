@@ -498,6 +498,86 @@ function NPCSystem.cleanup()
 	activeNPCs = {}
 end
 
+-- ============ TRAINING DUMMIES ============
+-- Stationary practice targets that auto-respawn 3s after death. They use the
+-- same R15 builder as combat NPCs (so they take damage via the HP attribute
+-- chain in MatchManager.FireWeapon) but skip runNPCAI — no chase, no attack,
+-- no patrol. Tracked separately from activeNPCs so the LOBBY-phase cleanup
+-- doesn't sweep them away.
+
+local activeDummies = {}  -- list of NPC models currently in TrainingArena
+
+-- Watch one dummy's HP attribute; on death, drop loot is suppressed (training
+-- mode) and we respawn a fresh dummy at the same marker after a short delay.
+local function watchDummy(dummy, marker)
+	dummy:GetAttributeChangedSignal("HP"):Connect(function()
+		local hp = dummy:GetAttribute("HP")
+		if hp <= 0 and dummy:GetAttribute("State") ~= "Dead" then
+			dummy:SetAttribute("State", "Dead")
+			-- Death effect to clients (visual flash + NPCEliminated bus); skip
+			-- dropLoot — training mode awards no loot/coins.
+			events.NPCEliminated:FireAllClients(
+				dummy:GetAttribute("EnemyType"),
+				dummy.PrimaryPart and dummy.PrimaryPart.Position or Vector3.new(0, 0, 0)
+			)
+			task.wait(0.5)
+			-- Remove the corpse
+			for i, d in ipairs(activeDummies) do
+				if d == dummy then table.remove(activeDummies, i) break end
+			end
+			if dummy.Parent then dummy:Destroy() end
+			-- Respawn after 3s at the same marker (idempotent — guards against
+			-- the user clearing the arena via cleanup mid-respawn).
+			task.delay(3, function()
+				if marker and marker.Parent then
+					NPCSystem.spawnDummyAt(marker)
+				end
+			end)
+		end
+	end)
+end
+
+-- Spawn one stationary dummy at the given marker (Part with EnemyType attr).
+-- Public so the respawn timer in watchDummy can re-invoke it.
+function NPCSystem.spawnDummyAt(marker)
+	local enemyType = marker:GetAttribute("EnemyType")
+	if not enemyType then return end
+	local npc = createR15NPC(enemyType, marker.Position)
+	if not npc then return end
+	npc:SetAttribute("IsTrainingDummy", true)
+	-- Pin the dummy in place: anchor the HumanoidRootPart so it doesn't
+	-- respond to physics (it'll still ragdoll on death briefly but won't
+	-- wander). Humanoid:MoveTo isn't called from any AI loop on dummies.
+	local hrp = npc:FindFirstChild("HumanoidRootPart")
+	if hrp then hrp.Anchored = true end
+	-- Disable the Animate LocalScript's idle animation so the dummy stands
+	-- perfectly still (otherwise the default R15 idle bob runs).
+	local animate = npc:FindFirstChild("Animate")
+	if animate then animate.Disabled = true end
+	npc.Parent = workspace
+	table.insert(activeDummies, npc)
+	watchDummy(npc, marker)
+	-- NOTE: deliberately do NOT spawn runNPCAI on dummies.
+end
+
+-- Spawn all dummies from TrainingArena.DummySpawns markers. Idempotent: if
+-- dummies already exist, returns without re-spawning. Called by TrainingService
+-- on first portal entry.
+function NPCSystem.spawnTrainingDummies()
+	if #activeDummies > 0 then return end  -- already populated this session
+	local arena = workspace:FindFirstChild("LastZone")
+		and workspace.LastZone:FindFirstChild("TrainingArena")
+	local spawns = arena and arena:FindFirstChild("DummySpawns")
+	if not spawns then
+		warn("[NPCSystem] TrainingArena.DummySpawns not found")
+		return
+	end
+	for _, marker in ipairs(spawns:GetChildren()) do
+		NPCSystem.spawnDummyAt(marker)
+	end
+	print("[NPCSystem] Spawned", #activeDummies, "training dummies")
+end
+
 -- React to phase changes via MatchManager.PhaseChangedServer (server-only
 -- BindableEvent) instead of polling. MatchManager loads asynchronously via
 -- task.defer at its tail, so the event may not exist on this script's first
@@ -527,5 +607,7 @@ task.spawn(function()
 		NPCSystem.spawnNPCs()
 	end
 end)
+
+_G.NPCSystem = NPCSystem  -- expose for TrainingService.spawnTrainingDummies
 
 return NPCSystem

@@ -21,6 +21,7 @@ local events = ReplicatedStorage:WaitForChild("GameEvents")
 local INTERACTIVE_UIS = {
 	ShopUI = true,
 	DailyQuestUI = true,
+	TrainingArenaUI = true,
 }
 
 local inArena = false  -- set true on PvE/PvPWarning/PvP, false on Lobby/MatchEnd

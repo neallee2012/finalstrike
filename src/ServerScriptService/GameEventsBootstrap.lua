@@ -72,6 +72,11 @@ makeRemoteEvent("DailyQuestUpdate")     -- server → client: { Date, Progress, 
 makeRemoteEvent("ClaimDailyQuest")      -- client → server: questId
 makeRemoteEvent("ClaimDailyQuestResult")-- server → client: success, reason, questId
 
+-- Training arena (NPC practice mode — bypasses match flow + ownership checks)
+makeRemoteEvent("EnterTrainingArena")   -- server → client: open weapon picker UI on arrival
+makeRemoteEvent("SelectTrainingWeapon") -- client → server: weaponName (any weapon, no ownership)
+makeRemoteEvent("ExitTrainingArena")    -- server → client: close weapon picker (on leave)
+
 -- Initial-state queries (sync, avoid client/server subscribe race on player join)
 makeRemoteFunction("GetCurrency")       -- client → server, returns int coin balance
 makeRemoteFunction("GetOwnedWeapons")   -- client → server, returns sorted list of owned weapon names

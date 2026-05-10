@@ -470,6 +470,376 @@ function MAP.buildSpectatorArea(parent)
 	return spec
 end
 
+-- ============ TRAINING ARENA ============
+-- Standalone NPC training zone the player teleports into via the lobby's
+-- TrainingArenaPortal. Inside: weapon picker on entry (UI driven by
+-- TrainingService), 6 stationary dummy NPCs in the corners (no AI, just
+-- targets), and an exit pad that teleports back to the lobby.
+function MAP.buildTrainingArena(parent)
+	local zone = Instance.new("Folder")
+	zone.Name = "TrainingArena"
+	zone.Parent = parent
+
+	local CENTER = Vector3.new(500, 0, 0)  -- offset clear of LastZone Arena (z=-400)
+
+	-- Floor
+	makePart({
+		Name = "TrainingFloor",
+		Size = Vector3.new(120, 2, 120),
+		Position = CENTER + Vector3.new(0, -1, 0),
+		Color = Color3.fromRGB(40, 38, 50),
+		Material = Enum.Material.Slate,
+		Parent = zone,
+	})
+
+	-- Walls (4 sides) with red neon accent strip near the floor
+	local walls = {
+		{ Vector3.new(120, 25, 2), Vector3.new(0, 11.5, 61) },
+		{ Vector3.new(120, 25, 2), Vector3.new(0, 11.5, -61) },
+		{ Vector3.new(2, 25, 120), Vector3.new(61, 11.5, 0) },
+		{ Vector3.new(2, 25, 120), Vector3.new(-61, 11.5, 0) },
+	}
+	for i, w in ipairs(walls) do
+		makePart({
+			Name = "TrainingWall" .. i,
+			Size = w[1],
+			Position = CENTER + w[2],
+			Color = Color3.fromRGB(35, 30, 40),
+			Material = Enum.Material.Concrete,
+			Parent = zone,
+		})
+	end
+
+	-- Red accent strips at floor level on each long wall (cinematic neon look)
+	for i, side in ipairs({ -60, 60 }) do
+		local strip = makePart({
+			Name = "TrainingAccent" .. i,
+			Size = Vector3.new(120, 0.3, 0.3),
+			Position = CENTER + Vector3.new(0, 0.5, side),
+			Color = Color3.fromRGB(255, 50, 40),
+			Material = Enum.Material.Neon,
+			Parent = zone,
+		})
+		addLight(strip, Color3.fromRGB(255, 50, 40), 1, 25)
+	end
+
+	-- Ceiling lights (4 across the room for visibility)
+	for i = -1, 1, 2 do
+		for j = -1, 1, 2 do
+			local light = makePart({
+				Name = string.format("TrainingCeilLight_%d_%d", i, j),
+				Size = Vector3.new(4, 0.5, 4),
+				Position = CENTER + Vector3.new(i * 35, 22, j * 35),
+				Color = Color3.fromRGB(255, 220, 200),
+				Material = Enum.Material.Neon,
+				Transparency = 0.2,
+				Parent = zone,
+			})
+			addSpotLight(light, Color3.fromRGB(255, 220, 200), 1.5, 40, 70)
+		end
+	end
+
+	-- Title sign on far wall: "TRAINING ARENA"
+	local titleSign = makePart({
+		Name = "TrainingTitleSign",
+		Size = Vector3.new(50, 8, 1),
+		Position = CENTER + Vector3.new(0, 14, -59),
+		Color = Color3.fromRGB(20, 20, 25),
+		Material = Enum.Material.SmoothPlastic,
+		Parent = zone,
+	})
+	local sg = Instance.new("SurfaceGui")
+	sg.Face = Enum.NormalId.Front  -- visible from +Z side (player entering)
+	sg.Parent = titleSign
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.Size = UDim2.new(1, 0, 1, 0)
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.Text = "TRAINING ARENA"
+	titleLabel.TextColor3 = Color3.fromRGB(255, 60, 50)
+	titleLabel.TextScaled = true
+	titleLabel.Font = Enum.Font.GothamBold
+	titleLabel.Parent = sg
+
+	-- Dummy NPC spawn markers in the corners (4) + 2 mid-room flanks for variety.
+	-- NPCSystem.spawnTrainingDummies() reads these markers and spawns stationary NPCs.
+	local dummySpawns = Instance.new("Folder")
+	dummySpawns.Name = "DummySpawns"
+	dummySpawns.Parent = zone
+
+	local dummyPositions = {
+		{ Type = "Patrol",  Pos = Vector3.new(-50, 1, -50) },
+		{ Type = "Patrol",  Pos = Vector3.new( 50, 1, -50) },
+		{ Type = "Armored", Pos = Vector3.new(-50, 1,  50) },
+		{ Type = "Armored", Pos = Vector3.new( 50, 1,  50) },
+		{ Type = "Elite",   Pos = Vector3.new(-30, 1,   0) },
+		{ Type = "Elite",   Pos = Vector3.new( 30, 1,   0) },
+	}
+	for i, d in ipairs(dummyPositions) do
+		local marker = Instance.new("Part")
+		marker.Name = d.Type .. "Dummy" .. i
+		marker.Size = Vector3.new(2, 0.2, 2)
+		marker.Position = CENTER + d.Pos
+		marker.Anchored = true
+		marker.CanCollide = false
+		marker.Transparency = 1
+		marker.Parent = dummySpawns
+		marker:SetAttribute("EnemyType", d.Type)
+	end
+
+	-- Player entry spawn (TrainingService teleports here on portal touch)
+	local entry = Instance.new("Part")
+	entry.Name = "TrainingEntry"
+	entry.Size = Vector3.new(4, 0.2, 4)
+	entry.Position = CENTER + Vector3.new(0, 1, 50)
+	entry.Anchored = true
+	entry.CanCollide = false
+	entry.Transparency = 1
+	entry.Parent = zone
+
+	-- Exit pad (player touches → teleport back to lobby). Visible green pad
+	-- in the corner near entry, with a "BACK TO LOBBY" sign above it.
+	local exitPad = makePart({
+		Name = "TrainingExitPad",
+		Size = Vector3.new(8, 0.5, 8),
+		Position = CENTER + Vector3.new(50, 0.25, 50),
+		Color = Color3.fromRGB(180, 50, 40),
+		Material = Enum.Material.Neon,
+		Parent = zone,
+	})
+	addLight(exitPad, Color3.fromRGB(255, 80, 60), 1.5, 15)
+	local exitGui = Instance.new("SurfaceGui")
+	exitGui.Face = Enum.NormalId.Top
+	exitGui.Parent = exitPad
+	local exitLabel = Instance.new("TextLabel")
+	exitLabel.Size = UDim2.new(1, 0, 1, 0)
+	exitLabel.BackgroundTransparency = 1
+	exitLabel.Text = "BACK TO LOBBY"
+	exitLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	exitLabel.TextScaled = true
+	exitLabel.Font = Enum.Font.GothamBold
+	exitLabel.Parent = exitGui
+
+	return zone
+end
+
+-- ============ LOBBY VISUAL UPGRADES ============
+-- Adds the FINAL STRIKE branding banner, ONE LIFE tagline, GUN SHOP pedestal,
+-- NPC TRAINING ARENA portal archway + pad, and game-modes side panel.
+-- Called after buildLobby has placed the basic walls/floor/StartMatchPad.
+-- Reference image: dark industrial sci-fi with red neon accents.
+function MAP.upgradeLobbyVisuals(lobby)
+	-- BIG BANNER on the wall opposite the LobbySpawn (z=+41 side, since spawn
+	-- at z=-10 faces +Z by default). Two stacked SurfaceGuis: top = FINAL STRIKE,
+	-- bottom = ONE LIFE tagline.
+	local bannerWall = makePart({
+		Name = "BannerWall",
+		Size = Vector3.new(50, 14, 1),
+		Position = Vector3.new(0, 11, 39),
+		Color = Color3.fromRGB(15, 15, 20),
+		Material = Enum.Material.SmoothPlastic,
+		Parent = lobby,
+	})
+	local bannerGui = Instance.new("SurfaceGui")
+	bannerGui.Face = Enum.NormalId.Back  -- -Z face, visible from inside the room
+	bannerGui.Parent = bannerWall
+	-- Title row
+	local title = Instance.new("TextLabel")
+	title.Name = "TitleLine"
+	title.Size = UDim2.new(1, 0, 0.25, 0)
+	title.Position = UDim2.new(0, 0, 0, 0)
+	title.BackgroundTransparency = 1
+	title.Text = "🎯  FINAL STRIKE"
+	title.TextColor3 = Color3.fromRGB(255, 60, 50)
+	title.TextScaled = true
+	title.Font = Enum.Font.GothamBlack
+	title.Parent = bannerGui
+	-- ONE LIFE big text
+	local oneLife = Instance.new("TextLabel")
+	oneLife.Name = "OneLife"
+	oneLife.Size = UDim2.new(1, 0, 0.35, 0)
+	oneLife.Position = UDim2.new(0, 0, 0.25, 0)
+	oneLife.BackgroundTransparency = 1
+	oneLife.Text = "ONE LIFE"
+	oneLife.TextColor3 = Color3.fromRGB(255, 255, 255)
+	oneLife.TextScaled = true
+	oneLife.Font = Enum.Font.GothamBlack
+	oneLife.Parent = bannerGui
+	-- Tagline rows (two lines)
+	local tagline = Instance.new("TextLabel")
+	tagline.Name = "Tagline1"
+	tagline.Size = UDim2.new(1, 0, 0.18, 0)
+	tagline.Position = UDim2.new(0, 0, 0.6, 0)
+	tagline.BackgroundTransparency = 1
+	tagline.Text = "WHO SHOOTS, WHO WINS"
+	tagline.TextColor3 = Color3.fromRGB(255, 60, 50)
+	tagline.TextScaled = true
+	tagline.Font = Enum.Font.GothamBold
+	tagline.Parent = bannerGui
+	local tagline2 = Instance.new("TextLabel")
+	tagline2.Name = "Tagline2"
+	tagline2.Size = UDim2.new(1, 0, 0.18, 0)
+	tagline2.Position = UDim2.new(0, 0, 0.78, 0)
+	tagline2.BackgroundTransparency = 1
+	tagline2.Text = "WHO DOESN'T SHOOT, WHO DIES FIRST"
+	tagline2.TextColor3 = Color3.fromRGB(220, 220, 220)
+	tagline2.TextScaled = true
+	tagline2.Font = Enum.Font.GothamMedium
+	tagline2.Parent = bannerGui
+
+	-- GUN SHOP pedestal — visible "shop" landmark in the lobby center.
+	-- Shop UI still opens with B (existing ShopController), this is a visual cue.
+	local shopBase = makePart({
+		Name = "GunShopPedestal",
+		Size = Vector3.new(14, 1, 8),
+		Position = Vector3.new(0, 0.5, 0),
+		Color = Color3.fromRGB(25, 22, 30),
+		Material = Enum.Material.Metal,
+		Parent = lobby,
+	})
+	local shopBack = makePart({
+		Name = "GunShopBack",
+		Size = Vector3.new(14, 6, 1),
+		Position = Vector3.new(0, 4, 4),
+		Color = Color3.fromRGB(20, 20, 25),
+		Material = Enum.Material.SmoothPlastic,
+		Parent = lobby,
+	})
+	local shopGui = Instance.new("SurfaceGui")
+	shopGui.Face = Enum.NormalId.Front  -- -Z (toward spawn at z=-10)
+	shopGui.Parent = shopBack
+	local shopLbl = Instance.new("TextLabel")
+	shopLbl.Size = UDim2.new(1, 0, 0.55, 0)
+	shopLbl.Position = UDim2.new(0, 0, 0, 0)
+	shopLbl.BackgroundTransparency = 1
+	shopLbl.Text = "GUN SHOP"
+	shopLbl.TextColor3 = Color3.fromRGB(255, 60, 50)
+	shopLbl.TextScaled = true
+	shopLbl.Font = Enum.Font.GothamBlack
+	shopLbl.Parent = shopGui
+	local shopHint = Instance.new("TextLabel")
+	shopHint.Size = UDim2.new(1, 0, 0.35, 0)
+	shopHint.Position = UDim2.new(0, 0, 0.6, 0)
+	shopHint.BackgroundTransparency = 1
+	shopHint.Text = "PRESS  B  TO OPEN"
+	shopHint.TextColor3 = Color3.fromRGB(255, 215, 0)
+	shopHint.TextScaled = true
+	shopHint.Font = Enum.Font.GothamMedium
+	shopHint.Parent = shopGui
+
+	-- NPC TRAINING ARENA portal on the LEFT wall (x=-41).
+	-- Player walks toward this arch and steps on the pad to teleport.
+	local archFrame = makePart({
+		Name = "TrainingArch",
+		Size = Vector3.new(2, 12, 12),
+		Position = Vector3.new(-39, 6, -10),
+		Color = Color3.fromRGB(25, 25, 35),
+		Material = Enum.Material.SmoothPlastic,
+		Parent = lobby,
+	})
+	-- Red accent neon strip framing the arch
+	local archNeon = makePart({
+		Name = "TrainingArchNeon",
+		Size = Vector3.new(0.5, 11, 11),
+		Position = Vector3.new(-38, 6, -10),
+		Color = Color3.fromRGB(255, 60, 50),
+		Material = Enum.Material.Neon,
+		Transparency = 0.4,
+		Parent = lobby,
+	})
+	addLight(archNeon, Color3.fromRGB(255, 60, 50), 2, 25)
+	-- Sign over the portal
+	local archSign = makePart({
+		Name = "TrainingArchSign",
+		Size = Vector3.new(1, 3, 14),
+		Position = Vector3.new(-39, 13.5, -10),
+		Color = Color3.fromRGB(15, 15, 20),
+		Material = Enum.Material.SmoothPlastic,
+		Parent = lobby,
+	})
+	local archGui = Instance.new("SurfaceGui")
+	archGui.Face = Enum.NormalId.Right  -- +X face (toward room interior)
+	archGui.Parent = archSign
+	local archLbl = Instance.new("TextLabel")
+	archLbl.Size = UDim2.new(1, 0, 1, 0)
+	archLbl.BackgroundTransparency = 1
+	archLbl.Text = "NPC TRAINING ARENA"
+	archLbl.TextColor3 = Color3.fromRGB(255, 60, 50)
+	archLbl.TextScaled = true
+	archLbl.Font = Enum.Font.GothamBold
+	archLbl.Parent = archGui
+	-- Touch pad in front of the arch — TrainingService listens for Touched
+	local trainingPad = makePart({
+		Name = "TrainingArenaPortal",
+		Size = Vector3.new(8, 0.5, 8),
+		Position = Vector3.new(-32, 0.25, -10),
+		Color = Color3.fromRGB(80, 30, 30),
+		Material = Enum.Material.Neon,
+		Parent = lobby,
+	})
+	addLight(trainingPad, Color3.fromRGB(255, 80, 60), 1.5, 18)
+	local padGui = Instance.new("SurfaceGui")
+	padGui.Face = Enum.NormalId.Top
+	padGui.Parent = trainingPad
+	local padLbl = Instance.new("TextLabel")
+	padLbl.Size = UDim2.new(1, 0, 1, 0)
+	padLbl.BackgroundTransparency = 1
+	padLbl.Text = "ENTER TRAINING"
+	padLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+	padLbl.TextScaled = true
+	padLbl.Font = Enum.Font.GothamBold
+	padLbl.Parent = padGui
+
+	-- Right-wall side panel: CLASSIC TEAMS modes (display-only — these aren't
+	-- implemented; the panel shows the planned modes per the reference design).
+	local modePanel = makePart({
+		Name = "ModePanel",
+		Size = Vector3.new(1, 16, 22),
+		Position = Vector3.new(39, 9, -10),
+		Color = Color3.fromRGB(15, 15, 20),
+		Material = Enum.Material.SmoothPlastic,
+		Parent = lobby,
+	})
+	local modeGui = Instance.new("SurfaceGui")
+	modeGui.Face = Enum.NormalId.Left  -- -X face
+	modeGui.Parent = modePanel
+	local modeTitle = Instance.new("TextLabel")
+	modeTitle.Size = UDim2.new(1, 0, 0.18, 0)
+	modeTitle.Position = UDim2.new(0, 0, 0, 0)
+	modeTitle.BackgroundTransparency = 1
+	modeTitle.Text = "CLASSIC TEAMS"
+	modeTitle.TextColor3 = Color3.fromRGB(220, 220, 220)
+	modeTitle.TextScaled = true
+	modeTitle.Font = Enum.Font.GothamMedium
+	modeTitle.Parent = modeGui
+	local modeBig = Instance.new("TextLabel")
+	modeBig.Size = UDim2.new(1, 0, 0.32, 0)
+	modeBig.Position = UDim2.new(0, 0, 0.18, 0)
+	modeBig.BackgroundTransparency = 1
+	modeBig.Text = "8v8"
+	modeBig.TextColor3 = Color3.fromRGB(255, 60, 50)
+	modeBig.TextScaled = true
+	modeBig.Font = Enum.Font.GothamBlack
+	modeBig.Parent = modeGui
+	local modeOther = Instance.new("TextLabel")
+	modeOther.Size = UDim2.new(1, 0, 0.18, 0)
+	modeOther.Position = UDim2.new(0, 0, 0.55, 0)
+	modeOther.BackgroundTransparency = 1
+	modeOther.Text = "2v2  ·  4v4  ·  FREE"
+	modeOther.TextColor3 = Color3.fromRGB(220, 220, 220)
+	modeOther.TextScaled = true
+	modeOther.Font = Enum.Font.GothamBold
+	modeOther.Parent = modeGui
+	local modeCrisis = Instance.new("TextLabel")
+	modeCrisis.Size = UDim2.new(1, 0, 0.22, 0)
+	modeCrisis.Position = UDim2.new(0, 0, 0.78, 0)
+	modeCrisis.BackgroundTransparency = 1
+	modeCrisis.Text = "CRISIS"
+	modeCrisis.TextColor3 = Color3.fromRGB(255, 60, 50)
+	modeCrisis.TextScaled = true
+	modeCrisis.Font = Enum.Font.GothamBlack
+	modeCrisis.Parent = modeGui
+end
+
 -- ============ BUILD ALL ============
 function MAP.buildAll()
 	setupAtmosphere()
@@ -486,9 +856,11 @@ function MAP.buildAll()
 	mapFolder.Name = "LastZone"
 	mapFolder.Parent = workspace
 
-	MAP.buildLobby(mapFolder)
+	local lobby = MAP.buildLobby(mapFolder)
+	MAP.upgradeLobbyVisuals(lobby)
 	MAP.buildArena(mapFolder)
 	MAP.buildSpectatorArea(mapFolder)
+	MAP.buildTrainingArena(mapFolder)
 
 	print("[MapBuilder] Map generated successfully!")
 	return mapFolder
