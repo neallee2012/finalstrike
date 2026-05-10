@@ -852,6 +852,14 @@ function MAP.buildAll()
 		if default then default:Destroy() end
 	end
 
+	-- (#37 round 2) Defensive: if LastZone already exists from a prior script
+	-- reload, destroy it first. Without this, Studio playtest cycles can
+	-- accumulate multiple "LastZone" folders, and TrainingService binds its
+	-- portal Touched signal to the FIRST one it finds — which may be empty
+	-- because something else destroyed its children. Sweep clean every time.
+	local existing = workspace:FindFirstChild("LastZone")
+	if existing then existing:Destroy() end
+
 	local mapFolder = Instance.new("Folder")
 	mapFolder.Name = "LastZone"
 	mapFolder.Parent = workspace
