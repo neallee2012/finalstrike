@@ -18,8 +18,10 @@
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
 
 local GameConfig = require(ReplicatedStorage:WaitForChild("GameConfig"))
+local CurrencyMath = require(ServerStorage:WaitForChild("CurrencyMath"))
 local events = ReplicatedStorage:WaitForChild("GameEvents")
 
 local CurrencyService = {}
@@ -28,6 +30,12 @@ local store = DataStoreService:GetDataStore("PlayerCurrency_v1")
 
 -- [player] = { Coins = int, MatchEarned = { NpcKills, Survival, PlayerKills, Total } }
 local data = {}
+
+-- [player] = true once GetAsync succeeded for this player. savePlayer is a no-op
+-- otherwise — prevents the "load failed → default 0 → overwrite real save" data
+-- loss path. A failed load means we don't know what the player had, so we don't
+-- write anything back.
+local loaded = {}
 
 local function newMatchCounters()
 	return { NpcKills = 0, Survival = 0, PlayerKills = 0, Total = 0 }
@@ -51,17 +59,24 @@ local function loadPlayer(player)
 		if type(result) == "number" then
 			coins = result
 		end
+		loaded[player] = true
 	else
 		warn("[CurrencyService] Load failed for " .. player.Name .. ": " .. tostring(result))
 	end
 	data[player] = { Coins = coins, MatchEarned = newMatchCounters() }
 	pushUpdate(player)
-	print(string.format("[CurrencyService] Loaded %s = %d coins", player.Name, coins))
+	print(string.format("[CurrencyService] Loaded %s = %d coins (loaded=%s)", player.Name, coins, tostring(loaded[player] == true)))
 end
 
 local function savePlayer(player)
 	local entry = data[player]
 	if not entry then return end
+	if not loaded[player] then
+		-- Load failed; entry.Coins is the default (0). Writing it would overwrite
+		-- the player's real saved balance. Skip.
+		warn("[CurrencyService] Skipping save for " .. player.Name .. " (load never succeeded)")
+		return
+	end
 	local ok, err = pcall(function()
 		store:SetAsync(tostring(player.UserId), entry.Coins)
 	end)
@@ -85,27 +100,16 @@ function CurrencyService.addCoins(player, amount, category)
 	local caps = GameConfig.ECONOMY.MatchCaps
 	local earned = entry.MatchEarned
 
-	-- Per-category cap (only NpcKills / Survival / PlayerKills have one)
-	if category and caps[category] then
-		local headroom = caps[category] - earned[category]
-		if headroom <= 0 then return 0 end
-		amount = math.min(amount, headroom)
-	end
+	local applied = CurrencyMath.computeAppliedAmount(caps, earned, amount, category)
+	if applied <= 0 then return 0 end
 
-	-- Per-match total cap (always enforced)
-	local totalHeadroom = caps.MatchTotal - earned.Total
-	if totalHeadroom <= 0 then return 0 end
-	amount = math.min(amount, totalHeadroom)
-
-	if amount <= 0 then return 0 end
-
-	entry.Coins = entry.Coins + amount
-	earned.Total = earned.Total + amount
+	entry.Coins = entry.Coins + applied
+	earned.Total = earned.Total + applied
 	if category and earned[category] then
-		earned[category] = earned[category] + amount
+		earned[category] = earned[category] + applied
 	end
 	pushUpdate(player)
-	return amount
+	return applied
 end
 
 -- Spend for shop purchases. Returns true on success, false if insufficient.
@@ -153,6 +157,7 @@ for _, p in ipairs(Players:GetPlayers()) do task.spawn(loadPlayer, p) end
 Players.PlayerRemoving:Connect(function(player)
 	savePlayer(player)
 	data[player] = nil
+	loaded[player] = nil
 end)
 
 -- Save all on shutdown (BindToClose runs synchronously with ~30s budget)

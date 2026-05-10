@@ -26,6 +26,10 @@ local DailyQuestService = {}
 local store = DataStoreService:GetDataStore("PlayerDailyQuests_v1")
 local data = {}  -- [player] = { Date = "...", Progress = {...}, Claimed = {...} }
 
+-- [player] = true once GetAsync succeeded. savePlayer is gated so a failed load
+-- can't overwrite real saved progress with an empty default.
+local loaded = {}
+
 local function todayUTC()
 	return os.date("!%Y-%m-%d")
 end
@@ -64,22 +68,32 @@ local function loadPlayer(player)
 	local ok, result = pcall(function()
 		return store:GetAsync(tostring(player.UserId))
 	end)
-	if ok and type(result) == "table" and type(result.Date) == "string" then
-		entry.Date = result.Date
-		entry.Progress = (type(result.Progress) == "table") and result.Progress or {}
-		entry.Claimed = (type(result.Claimed) == "table") and result.Claimed or {}
-	elseif not ok then
+	if ok then
+		if type(result) == "table" and type(result.Date) == "string" then
+			entry.Date = result.Date
+			entry.Progress = (type(result.Progress) == "table") and result.Progress or {}
+			entry.Claimed = (type(result.Claimed) == "table") and result.Claimed or {}
+		end
+		-- ok==true with nil result is the "first-time player" case; entry stays as newEmptyState().
+		loaded[player] = true
+	else
 		warn("[DailyQuestService] Load failed for " .. player.Name .. ": " .. tostring(result))
 	end
 	ensureFreshDay(entry)  -- if loaded from yesterday, reset
 	data[player] = entry
 	pushUpdate(player)
-	print(string.format("[DailyQuestService] Loaded %s (date=%s)", player.Name, entry.Date))
+	print(string.format("[DailyQuestService] Loaded %s (date=%s, loaded=%s)", player.Name, entry.Date, tostring(loaded[player] == true)))
 end
 
 local function savePlayer(player)
 	local entry = data[player]
 	if not entry then return end
+	if not loaded[player] then
+		-- Load failed; entry is empty default. Writing it would erase real saved
+		-- progress + claims. Skip.
+		warn("[DailyQuestService] Skipping save for " .. player.Name .. " (load never succeeded)")
+		return
+	end
 	local ok, err = pcall(function()
 		store:SetAsync(tostring(player.UserId), entry)
 	end)
@@ -169,6 +183,7 @@ for _, p in ipairs(Players:GetPlayers()) do task.spawn(loadPlayer, p) end
 Players.PlayerRemoving:Connect(function(player)
 	savePlayer(player)
 	data[player] = nil
+	loaded[player] = nil
 end)
 
 game:BindToClose(function()
