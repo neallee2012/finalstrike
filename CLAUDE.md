@@ -177,3 +177,27 @@ _隨開發進度持續更新_
 - **HP reset on death 不靠 Roblox spawn**：Roblox `Humanoid.Died` 觸發 spawn 重置會干擾 spectator camera。改為 server 端手動 setter — `data.HP = data.MaxHP` 在 `eliminatePlayer` 後（commit 253863f）
 - **PR 開太多時注意 work truth vs execution truth 脫節**：Sprint 8 在 PR #23 寫設計提案期間 main 跑進 12 commits，作者不知道 30-weapon shop 已存在。導致提案基於「6 武器世界」假設，merge 前 PR review 抓到嚴重矛盾。Lesson：每次開新提案 PR 前先 `git fetch + git log HEAD..origin/main` audit
 - **Workload contracts 是 PR review 的設計地圖**：Sprint 8 期間實作 8 個新 .lua 檔案但沒補對應 contract → Sprint 8b 設計時不知道 main 已是 30 武器世界。Sprint 8a 補檔 5 份 contract（workloads/12–16）+ 1 份 receipt（receipts/sprint-8-shop-economy-fps.md）對齊。原則：每個新系統 .lua 必須有對應 workload contract，違反 = work truth 與 execution truth 脫節
+
+## gstack (REQUIRED — global install)
+
+**Before doing ANY work, verify gstack is installed:**
+
+```bash
+test -d ~/.claude/skills/gstack/bin && echo "GSTACK_OK" || echo "GSTACK_MISSING"
+```
+
+If GSTACK_MISSING: STOP. Do not proceed. Tell the user:
+
+> gstack is required for all AI-assisted work in this repo.
+> Install it:
+> ```bash
+> git clone --depth 1 https://github.com/garrytan/gstack.git ~/.claude/skills/gstack
+> cd ~/.claude/skills/gstack && ./setup --team
+> ```
+> Then restart your AI coding tool.
+
+Do not skip skills, ignore gstack errors, or work around missing gstack.
+
+Using gstack skills: After install, skills like /qa, /ship, /review, /investigate,
+and /browse are available. Use /browse for all web browsing.
+Use ~/.claude/skills/gstack/... for gstack file paths (the global path).

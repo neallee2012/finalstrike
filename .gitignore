@@ -1,0 +1,9 @@
+# Claude Code local-only state (per-developer; never commit)
+.claude/settings.local.json
+.claude/worktrees/
+.claude/scheduled_tasks.json
+.claude/scheduled_tasks.lock
+
+# Committed under .claude/ on purpose (team-mode bootstrap):
+#   .claude/settings.json     — PreToolUse hook for gstack enforcement
+#   .claude/hooks/             — repo-shared hooks
