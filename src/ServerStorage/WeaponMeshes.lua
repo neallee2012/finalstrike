@@ -200,12 +200,19 @@ local TYPE_TO_BUILDER = {
 -- drives the off-hand grip solver — every viewer sees two-hand grip including
 -- NPCs and other players (#39).
 -- Nil entries (Pistol, Knife) mean "single-handed, no IK".
+--
+-- Avatar-Joint-Upgrade rigs cannot currently reach true foregrip targets with
+-- AlignPosition because the BallSocket arm chain pulls back before the hand
+-- crosses the torso. Keep two-handed targets near the right-hand grip so the
+-- visible bug is fixed first; a proper AnimationConstraint pose solver can move
+-- these forward later.
+local REAR_TWO_HAND_GRIP_OFFSET = Vector3.new(0.6, -0.3, -0.3)
 local LEFT_GRIP_OFFSET = {
-	SMG     = Vector3.new(0, 0.05, -0.55), -- on the magazine grip
-	Rifle   = Vector3.new(0, 0.10, -0.65), -- receiver / magwell, reachable on constraint rigs
-	Shotgun = Vector3.new(0, 0.25, -0.75), -- near pump, kept within left-arm reach
-	Sniper  = Vector3.new(0, 0.18, -0.55), -- near magazine, not unreachable mid-barrel
-	Minigun = Vector3.new(0, 0.05, -0.55), -- placeholder shares Stinger mesh
+	SMG     = REAR_TWO_HAND_GRIP_OFFSET,
+	Rifle   = REAR_TWO_HAND_GRIP_OFFSET,
+	Shotgun = REAR_TWO_HAND_GRIP_OFFSET,
+	Sniper  = REAR_TWO_HAND_GRIP_OFFSET,
+	Minigun = REAR_TWO_HAND_GRIP_OFFSET,
 }
 
 -- Public: build(weaponName) -> Tool (Handle is the BasePart, Muzzle is an
