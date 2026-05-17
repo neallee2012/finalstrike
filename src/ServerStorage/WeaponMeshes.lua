@@ -10,6 +10,7 @@
 -- polish sprint — fixes #9 (Stage 1 rename broke direct name lookup).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
 local GameConfig = require(ReplicatedStorage:WaitForChild("GameConfig"))
 
 local WeaponMeshes = {}
@@ -354,13 +355,26 @@ end
 function WeaponMeshes.attachLeftHandIK(character, tool)
 	if not character or not tool then return nil end
 
-	-- (#56) Skip IK on NPCs. On modern Avatar-Joint-Upgrade rigs this attaches
-	-- AlignPosition.RigidityEnabled=true between LeftHand and the gun's LeftGrip;
-	-- LeftHand → BallSocket joints → UpperTorso forms a closed kinematic loop
-	-- that drags HumanoidRootPart 4-5x WalkSpeed during locomotion. Players
-	-- need the off-hand grip in first person; NPCs are seen from third-party
-	-- distance where left-hand pose is irrelevant.
-	if character:GetAttribute("EnemyType") then return nil end
+	-- (#56) Disable server-side LeftHand IK entirely. On modern Avatar-Joint-Upgrade
+	-- rigs, AlignPosition.RigidityEnabled=true creates a closed kinematic loop
+	-- (LeftHand → BallSocket joints → UpperTorso) that drags HumanoidRootPart:
+	--   - NPCs: 4-5x WalkSpeed propulsion (Armored vmag 9.82 vs ws 2.40,
+	--     Elite vmag 19.64 vs ws 4.20 in Studio A/B).
+	--   - Players: 0.7-2.5 stud/s drift while standing still — RootPart moves
+	--     even when MoveDirection=(0,0,0); 100% eliminated by destroying the
+	--     AlignPosition in A/B test.
+	-- Softening (RigidityEnabled=false) doesn't help: BallSocket joint limits
+	-- pin the hand 2.2 studs from the LeftGrip regardless of MaxForce (1k–50k
+	-- all measured the same gap). The rigid pin is the only path that closes
+	-- that distance, and it's also the only path that causes the drag.
+	-- Trade-off: NPCs and other players' characters lose the two-hand grip
+	-- visual (LeftHand hangs at side) — the original PR #39 intent. Acceptable
+	-- because RootPart drift is gameplay-breaking. Re-enable when we have a
+	-- non-propulsive grip mechanism (custom animation, or anchor-style pin).
+	-- ViewmodelController's first-person viewmodel IK is unaffected (cosmetic
+	-- model separate from the actual character).
+	if true then return nil end
+	-- luacheck: ignore (rest kept for reference / future re-enable)
 
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if not humanoid then return nil end
