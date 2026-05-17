@@ -355,6 +355,24 @@ end
 function WeaponMeshes.attachLeftHandIK(character, tool)
 	if not character or not tool then return nil end
 
+	-- (#56) Fix Avatar-Joint-Upgrade RightGripAttachment orientation. Modern
+	-- R15 rigs (Players:CreateHumanoidModelFromDescription output) set the
+	-- attachment's local CFrame to Rx(90) — its -Z (the "grip forward"
+	-- direction Roblox uses to align Handle) points along the fingers, which
+	-- is DOWN when the arm hangs at the side. Tool.Parent = character creates
+	-- a Weld with C0 = attachment.CFrame, so the gun's barrel inherits this
+	-- downward orientation and ends up pointing straight into the floor.
+	-- Previously the rigid-pin LeftHand IK was masking this — its kinematic
+	-- loop force-rotated the right arm into a horizontal pose. With IK
+	-- disabled (below), the bug surfaces. Reset Weld.C0 to identity rotation
+	-- while preserving the position offset. Handle.LookVector then tracks
+	-- RightHand.LookVector, so the gun follows the animation pose naturally.
+	local rh = character:FindFirstChild("RightHand")
+	local weld = rh and rh:FindFirstChild("RightGrip")
+	if weld then
+		weld.C0 = CFrame.new(weld.C0.Position)
+	end
+
 	-- (#56) Disable server-side LeftHand IK entirely. On modern Avatar-Joint-Upgrade
 	-- rigs, AlignPosition.RigidityEnabled=true creates a closed kinematic loop
 	-- (LeftHand → BallSocket joints → UpperTorso) that drags HumanoidRootPart:
