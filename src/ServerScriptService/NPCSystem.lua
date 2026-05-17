@@ -547,6 +547,11 @@ function NPCSystem.spawnDummyAt(marker)
 	local npc = createR15NPC(enemyType, marker.Position)
 	if not npc then return end
 	npc:SetAttribute("IsTrainingDummy", true)
+	-- (#53) Training NPCs walk at TRAINING_SPEED_MULTIPLIER × match Speed so
+	-- weapon visuals, hit reactions, and combat are observable. AttackRate
+	-- and AttackRange unchanged — they still shoot at full match cadence.
+	local hum = npc:FindFirstChildOfClass("Humanoid")
+	if hum then hum.WalkSpeed = hum.WalkSpeed * GameConfig.TRAINING_SPEED_MULTIPLIER end
 	-- (#33) Training dummies now move + shoot. Was anchored static targets;
 	-- CEO requested mobile combat so practice is meaningful. We run the same
 	-- runNPCAI used for match NPCs — it patrols / chases / attacks the

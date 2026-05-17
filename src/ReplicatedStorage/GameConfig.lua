@@ -171,6 +171,13 @@ GameConfig.ENEMIES = {
 	},
 }
 
+-- (#53) Training arena NPCs walk at this fraction of their live-match Speed
+-- so weapon visuals, hit reactions, and combat readability are observable.
+-- AttackRate, AttackRange, DetectRange, HP, and Damage are unaffected — only
+-- WalkSpeed is multiplied. Applied in NPCSystem.spawnDummyAt; live-match
+-- spawns (NPCSystem.spawnWave) are untouched.
+GameConfig.TRAINING_SPEED_MULTIPLIER = 0.5
+
 -- Loot pickup values — Sprint 8b: 4-tier medkit ladder (200 HP rebalance).
 -- Weapon drops remain removed (weapons are shop-only).
 GameConfig.LOOT = {
