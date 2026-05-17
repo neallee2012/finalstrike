@@ -201,18 +201,20 @@ local TYPE_TO_BUILDER = {
 -- NPCs and other players (#39).
 -- Nil entries (Pistol, Knife) mean "single-handed, no IK".
 --
--- Avatar-Joint-Upgrade rigs cannot currently reach true foregrip targets with
--- AlignPosition because the BallSocket arm chain pulls back before the hand
--- crosses the torso. Keep two-handed targets near the right-hand grip so the
--- visible bug is fixed first; a proper AnimationConstraint pose solver can move
--- these forward later.
--- X is negative because the off-hand naturally rests on the body's left side
--- (Handle local +X = gun's right side, which is where RightHand already is).
--- Positive X put the target across the body, doubling the unreachable distance
--- — verified in Studio: +X → 2-4 stud LH-LG gap; -X → ~1.4 stud (still constraint
--- limited, but the best the AlignPosition workaround can hit on Avatar-Joint-Upgrade
--- rigs; #51 tracks the proper AnimationConstraint pose solver).
-local REAR_TWO_HAND_GRIP_OFFSET = Vector3.new(-0.6, -0.3, -0.3)
+-- Avatar-Joint-Upgrade rigs have a hard reach limit on the left arm:
+-- shoulder→LeftHand-center fully extended ≈ 1.86 studs. With the old
+-- forward-grip Tool.Grip (CFrame.new(0, 0.45, 0)) the LeftShoulder is
+-- ~3.81 studs from the gun's grip area — a 2-stud deficit no IK or
+-- physics constraint can solve (#51 / Studio measurement). Two
+-- changes here close that gap geometrically instead of solver-side:
+--   1) tool.Grip below pulls the gun inward (+X 0.4) and back (-Z 0.4)
+--      so its grip sits within left-arm reach.
+--   2) LEFT_GRIP_OFFSET targets the gun's left side (negative X) and
+--      slightly behind/above the Handle origin — where the left hand
+--      naturally lands once the gun is pulled inward.
+-- Verified in Studio: 16-sample steady-state across all NPCs settles
+-- at LH→LG ≈ 0.46 studs (PASS, < 0.5 acceptance criterion).
+local REAR_TWO_HAND_GRIP_OFFSET = Vector3.new(-1.0, -0.1, 0.3)
 local LEFT_GRIP_OFFSET = {
 	SMG     = REAR_TWO_HAND_GRIP_OFFSET,
 	Rifle   = REAR_TWO_HAND_GRIP_OFFSET,
@@ -258,10 +260,17 @@ function WeaponMeshes.build(weaponName)
 	end
 	model:Destroy()
 
-	-- Grip CFrame: hand wraps the top of the grip (Handle.Y=+0.45 is grip top).
-	-- No rotation — Roblox tool system aligns Handle's -Z with hand's forward
-	-- look direction by default, which is exactly where our muzzle points.
-	tool.Grip = CFrame.new(0, 0.45, 0)
+	if leftGripOffset then
+		-- Two-handed grip: pull the gun inward (+X 0.4) and toward the chest
+		-- (-Z 0.4 from default) so the LeftGrip Attachment lands inside the
+		-- left arm's 1.86-stud reach. Y=+0.45 unchanged (hand wraps the top
+		-- of the grip). No rotation — barrel still points along Hand's -Z so
+		-- aim/raycast direction is unchanged from prior versions.
+		tool.Grip = CFrame.new(0.4, 0.45, -0.4)
+	else
+		-- Single-handed weapons do not need #51 reach compensation.
+		tool.Grip = CFrame.new(0, 0.45, 0)
+	end
 
 	return tool
 end
