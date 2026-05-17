@@ -137,6 +137,11 @@ function MatchManager.attachWeapon(player, weaponName)
 	-- Parenting Tool directly to Character auto-equips it (skipping Backpack)
 	-- and triggers the engine's grip + tool-hold animation.
 	tool.Parent = char
+
+	-- (#39) Wire the off-hand IK on the server so every viewer (including
+	-- other players and spectators) sees two-hand grip, not just the local
+	-- first-person view.
+	WeaponMeshes.attachLeftHandIK(char, tool)
 end
 
 -- Hook respawn so the weapon re-attaches on the new Character.

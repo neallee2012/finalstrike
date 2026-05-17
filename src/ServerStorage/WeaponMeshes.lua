@@ -196,8 +196,9 @@ local TYPE_TO_BUILDER = {
 }
 
 -- Local position of the LeftGrip attachment (relative to Handle) per weapon Type.
--- ViewmodelController uses this to drive an IKControl that pins LeftHand to the
--- weapon — making both hands visually grip two-handed weapons in first-person.
+-- WeaponMeshes.attachLeftHandIK (called server-side from MatchManager + NPCSystem)
+-- drives an IKControl that pins LeftHand to this attachment — every viewer sees
+-- two-hand grip including NPCs and other players (#39).
 -- Nil entries (Pistol, Knife) mean "single-handed, no IK".
 local LEFT_GRIP_OFFSET = {
 	SMG     = Vector3.new(0, 0.5, -1.0),   -- ~Mag area
@@ -222,8 +223,8 @@ function WeaponMeshes.build(weaponName)
 	end
 	local model, handle = fn()
 
-	-- Add LeftGrip attachment for two-handed weapons so client IKControl can
-	-- snap the player's LeftHand to it (visual: both hands gripping the gun).
+	-- Add LeftGrip attachment for two-handed weapons so server IKControl can
+	-- snap the character's LeftHand to it (visual: both hands gripping the gun).
 	local leftGripOffset = LEFT_GRIP_OFFSET[cfg.Type]
 	if leftGripOffset then
 		local leftGrip = Instance.new("Attachment")
@@ -250,6 +251,68 @@ function WeaponMeshes.build(weaponName)
 	tool.Grip = CFrame.new(0, 0.45, 0)
 
 	return tool
+end
+
+-- Pin a character's LeftHand to the Tool's LeftGrip Attachment via IKControl,
+-- so the off-hand visibly grips two-handed weapons. Created on the server so
+-- the IKControl instance replicates to every viewer — local first-person,
+-- third-party observers, and NPC viewers all see the same two-hand grip.
+-- (#39) Previous implementation was client-only in ViewmodelController,
+-- which left NPCs and other players' characters with the off-hand hanging
+-- at the side.
+--
+-- No-op for single-handed weapons (Pistol / Knife — no LeftGrip Attachment).
+-- ChainRoot = UpperTorso so the IK solver has shoulder + elbow + wrist (3
+-- joints) of reach; LeftUpperArm-only chains can't bring the hand across
+-- the chest to the foregrip.
+function WeaponMeshes.attachLeftHandIK(character, tool)
+	if not character or not tool then return nil end
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return nil end
+	if not humanoid:FindFirstChildOfClass("Animator") then
+		local animator = Instance.new("Animator")
+		animator.Parent = humanoid
+	end
+
+	-- Tear down any prior IK from the previous weapon. Do this BEFORE the
+	-- single-handed early-return so swapping from a two-handed to a
+	-- single-handed weapon correctly clears the off-hand grip.
+	local existing = humanoid:FindFirstChild("LeftHandIK")
+	if existing then existing:Destroy() end
+
+	local handle = tool:FindFirstChild("Handle")
+	if not handle then return nil end
+	local leftGrip = handle:FindFirstChild("LeftGrip")
+	if not leftGrip or not leftGrip:IsA("Attachment") then return nil end  -- single-handed weapon
+
+	local leftHand = character:FindFirstChild("LeftHand")
+	local upperTorso = character:FindFirstChild("UpperTorso")
+	if not leftHand or not upperTorso then return nil end
+
+	local ik = Instance.new("IKControl")
+	ik.Name = "LeftHandIK"
+	ik.Type = Enum.IKControlType.Position
+	ik.ChainRoot = upperTorso
+	ik.EndEffector = leftHand
+	ik.Target = leftGrip
+	ik.Weight = 1.0
+	ik.SmoothTime = 0  -- LeftGrip is rigidly welded to RightHand; no smoothing needed
+	ik.Parent = humanoid
+
+	local function clearIK()
+		if ik.Parent then
+			ik:Destroy()
+		end
+	end
+	tool.Destroying:Connect(clearIK)
+	tool.AncestryChanged:Connect(function()
+		if tool.Parent ~= character then
+			clearIK()
+		end
+	end)
+
+	return ik
 end
 
 return WeaponMeshes
