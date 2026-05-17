@@ -223,8 +223,8 @@ function WeaponMeshes.build(weaponName)
 	end
 	local model, handle = fn()
 
-	-- Add LeftGrip attachment for two-handed weapons so client IKControl can
-	-- snap the player's LeftHand to it (visual: both hands gripping the gun).
+	-- Add LeftGrip attachment for two-handed weapons so server IKControl can
+	-- snap the character's LeftHand to it (visual: both hands gripping the gun).
 	local leftGripOffset = LEFT_GRIP_OFFSET[cfg.Type]
 	if leftGripOffset then
 		local leftGrip = Instance.new("Attachment")
@@ -270,6 +270,10 @@ function WeaponMeshes.attachLeftHandIK(character, tool)
 
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if not humanoid then return nil end
+	if not humanoid:FindFirstChildOfClass("Animator") then
+		local animator = Instance.new("Animator")
+		animator.Parent = humanoid
+	end
 
 	-- Tear down any prior IK from the previous weapon. Do this BEFORE the
 	-- single-handed early-return so swapping from a two-handed to a
@@ -280,7 +284,7 @@ function WeaponMeshes.attachLeftHandIK(character, tool)
 	local handle = tool:FindFirstChild("Handle")
 	if not handle then return nil end
 	local leftGrip = handle:FindFirstChild("LeftGrip")
-	if not leftGrip then return nil end  -- single-handed weapon
+	if not leftGrip or not leftGrip:IsA("Attachment") then return nil end  -- single-handed weapon
 
 	local leftHand = character:FindFirstChild("LeftHand")
 	local upperTorso = character:FindFirstChild("UpperTorso")
@@ -295,6 +299,19 @@ function WeaponMeshes.attachLeftHandIK(character, tool)
 	ik.Weight = 1.0
 	ik.SmoothTime = 0  -- LeftGrip is rigidly welded to RightHand; no smoothing needed
 	ik.Parent = humanoid
+
+	local function clearIK()
+		if ik.Parent then
+			ik:Destroy()
+		end
+	end
+	tool.Destroying:Connect(clearIK)
+	tool.AncestryChanged:Connect(function()
+		if tool.Parent ~= character then
+			clearIK()
+		end
+	end)
+
 	return ik
 end
 
