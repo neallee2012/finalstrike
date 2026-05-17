@@ -408,7 +408,22 @@ local function runNPCAI(npcModel)
 		local detectRange = npcModel:GetAttribute("DetectRange")
 		local attackRange = npcModel:GetAttribute("AttackRange")
 
-		if closestPlayer and closestDist <= detectRange then
+		-- (#53) Training-arena leash: if the dummy has drifted too far from its
+		-- spawn marker, suppress chase (NPC heads back to its patrol home
+		-- instead of pursuing the player around the arena). Attack-range
+		-- contact still triggers attack — player came to us. Live-match NPCs
+		-- have no HomePosition, so leashed = false for them.
+		local home = npcModel:GetAttribute("HomePosition")
+		local leashed = false
+		if home and (root.Position - home).Magnitude > (GameConfig.TRAINING_LEASH_RADIUS or math.huge) then
+			leashed = true
+		end
+		local canEngage = closestPlayer and (
+			closestDist <= attackRange
+			or (closestDist <= detectRange and not leashed)
+		)
+
+		if canEngage then
 			if closestDist <= attackRange then
 				-- Attack
 				npcModel:SetAttribute("State", "Attack")
@@ -458,8 +473,13 @@ local function runNPCAI(npcModel)
 			-- Patrol
 			npcModel:SetAttribute("State", "Patrol")
 			if not patrolTarget or (root.Position - patrolTarget).Magnitude < 5 then
-				patrolTarget = root.Position + Vector3.new(
-					math.random(-30, 30), 0, math.random(-30, 30)
+				-- (#53) Training NPCs wander tight around their HomePosition so
+				-- they stay near their spawn marker. Live NPCs use the original
+				-- ±30 around current position.
+				local base = home or root.Position
+				local radius = home and (GameConfig.TRAINING_PATROL_RADIUS or 6) or 30
+				patrolTarget = base + Vector3.new(
+					math.random(-radius, radius), 0, math.random(-radius, radius)
 				)
 			end
 			humanoid:MoveTo(patrolTarget)
@@ -547,9 +567,12 @@ function NPCSystem.spawnDummyAt(marker)
 	local npc = createR15NPC(enemyType, marker.Position)
 	if not npc then return end
 	npc:SetAttribute("IsTrainingDummy", true)
-	-- (#53) Training NPCs walk at TRAINING_SPEED_MULTIPLIER × match Speed so
-	-- weapon visuals, hit reactions, and combat are observable. AttackRate
-	-- and AttackRange unchanged — they still shoot at full match cadence.
+	-- (#53) Training-arena behavior profile. WalkSpeed reduced; DetectRange
+	-- replaced with the training-specific value (overrides the per-enemy match
+	-- value set by createR15NPC). HomePosition tag drives the patrol/leash
+	-- logic in runNPCAI so the dummy stays near its spawn marker.
+	npc:SetAttribute("DetectRange", GameConfig.TRAINING_DETECT_RANGE)
+	npc:SetAttribute("HomePosition", marker.Position)
 	local hum = npc:FindFirstChildOfClass("Humanoid")
 	if hum then hum.WalkSpeed = hum.WalkSpeed * GameConfig.TRAINING_SPEED_MULTIPLIER end
 	-- (#33) Training dummies now move + shoot. Was anchored static targets;
