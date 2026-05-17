@@ -260,12 +260,17 @@ function WeaponMeshes.build(weaponName)
 	end
 	model:Destroy()
 
-	-- Grip CFrame: pulls the gun inward (+X 0.4) and toward the chest
-	-- (-Z 0.4 from default) so the LeftGrip Attachment lands inside the
-	-- left arm's 1.86-stud reach. Y=+0.45 unchanged (hand wraps the top
-	-- of the grip). No rotation — barrel still points along Hand's -Z so
-	-- aim/raycast direction is unchanged from prior versions.
-	tool.Grip = CFrame.new(0.4, 0.45, -0.4)
+	if leftGripOffset then
+		-- Two-handed grip: pull the gun inward (+X 0.4) and toward the chest
+		-- (-Z 0.4 from default) so the LeftGrip Attachment lands inside the
+		-- left arm's 1.86-stud reach. Y=+0.45 unchanged (hand wraps the top
+		-- of the grip). No rotation — barrel still points along Hand's -Z so
+		-- aim/raycast direction is unchanged from prior versions.
+		tool.Grip = CFrame.new(0.4, 0.45, -0.4)
+	else
+		-- Single-handed weapons do not need #51 reach compensation.
+		tool.Grip = CFrame.new(0, 0.45, 0)
+	end
 
 	return tool
 end
