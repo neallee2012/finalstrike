@@ -354,6 +354,14 @@ end
 function WeaponMeshes.attachLeftHandIK(character, tool)
 	if not character or not tool then return nil end
 
+	-- (#56) Skip IK on NPCs. On modern Avatar-Joint-Upgrade rigs this attaches
+	-- AlignPosition.RigidityEnabled=true between LeftHand and the gun's LeftGrip;
+	-- LeftHand → BallSocket joints → UpperTorso forms a closed kinematic loop
+	-- that drags HumanoidRootPart 4-5x WalkSpeed during locomotion. Players
+	-- need the off-hand grip in first person; NPCs are seen from third-party
+	-- distance where left-hand pose is irrelevant.
+	if character:GetAttribute("EnemyType") then return nil end
+
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if not humanoid then return nil end
 
