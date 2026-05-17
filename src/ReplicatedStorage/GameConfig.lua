@@ -176,7 +176,7 @@ GameConfig.ENEMIES = {
 -- AttackRate, AttackRange, DetectRange, HP, and Damage are unaffected — only
 -- WalkSpeed is multiplied. Applied in NPCSystem.spawnDummyAt; live-match
 -- spawns (NPCSystem.spawnWave) are untouched.
-GameConfig.TRAINING_SPEED_MULTIPLIER = 0.5
+GameConfig.TRAINING_SPEED_MULTIPLIER = 0.3
 
 -- Loot pickup values — Sprint 8b: 4-tier medkit ladder (200 HP rebalance).
 -- Weapon drops remain removed (weapons are shop-only).
