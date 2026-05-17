@@ -197,15 +197,15 @@ local TYPE_TO_BUILDER = {
 
 -- Local position of the LeftGrip attachment (relative to Handle) per weapon Type.
 -- WeaponMeshes.attachLeftHandIK (called server-side from MatchManager + NPCSystem)
--- drives an IKControl that pins LeftHand to this attachment — every viewer sees
--- two-hand grip including NPCs and other players (#39).
+-- drives the off-hand grip solver — every viewer sees two-hand grip including
+-- NPCs and other players (#39).
 -- Nil entries (Pistol, Knife) mean "single-handed, no IK".
 local LEFT_GRIP_OFFSET = {
-	SMG     = Vector3.new(0, 0.5, -1.0),   -- ~Mag area
-	Rifle   = Vector3.new(0, 0.18, -1.4),  -- on the Foregrip
-	Shotgun = Vector3.new(0, 0.32, -1.0),  -- on the Pump
-	Sniper  = Vector3.new(0, 0.5, -2.0),   -- mid-barrel
-	Minigun = Vector3.new(0, 0.5, -1.0),
+	SMG     = Vector3.new(0, 0.05, -0.55), -- on the magazine grip
+	Rifle   = Vector3.new(0, 0.10, -0.65), -- receiver / magwell, reachable on constraint rigs
+	Shotgun = Vector3.new(0, 0.25, -0.75), -- near pump, kept within left-arm reach
+	Sniper  = Vector3.new(0, 0.18, -0.55), -- near magazine, not unreachable mid-barrel
+	Minigun = Vector3.new(0, 0.05, -0.55), -- placeholder shares Stinger mesh
 }
 
 -- Public: build(weaponName) -> Tool (Handle is the BasePart, Muzzle is an
@@ -223,7 +223,7 @@ function WeaponMeshes.build(weaponName)
 	end
 	local model, handle = fn()
 
-	-- Add LeftGrip attachment for two-handed weapons so server IKControl can
+	-- Add LeftGrip attachment for two-handed weapons so the server grip solver can
 	-- snap the character's LeftHand to it (visual: both hands gripping the gun).
 	local leftGripOffset = LEFT_GRIP_OFFSET[cfg.Type]
 	if leftGripOffset then
@@ -253,33 +253,101 @@ function WeaponMeshes.build(weaponName)
 	return tool
 end
 
--- Pin a character's LeftHand to the Tool's LeftGrip Attachment via IKControl,
--- so the off-hand visibly grips two-handed weapons. Created on the server so
--- the IKControl instance replicates to every viewer — local first-person,
--- third-party observers, and NPC viewers all see the same two-hand grip.
+local LEFT_ARM_PARTS = {
+	LeftUpperArm = true,
+	LeftLowerArm = true,
+	LeftHand = true,
+}
+
+local GRIP_ATTR = "FinalStrikeLeftGripDisabled"
+local GRIP_WAS_ENABLED_ATTR = "FinalStrikeLeftGripWasEnabled"
+
+local function isAnimationConstraint(instance)
+	local ok, result = pcall(function()
+		return instance:IsA("AnimationConstraint")
+	end)
+	return ok and result
+end
+
+local function animationConstraintTouchesLeftArm(constraint)
+	if constraint.Parent and LEFT_ARM_PARTS[constraint.Parent.Name] then
+		return true
+	end
+
+	for _, propertyName in ipairs({ "Attachment0", "Attachment1" }) do
+		local ok, attachment = pcall(function()
+			return constraint[propertyName]
+		end)
+		if ok and attachment and attachment.Parent and LEFT_ARM_PARTS[attachment.Parent.Name] then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function getLeftArmAnimationConstraints(character)
+	local constraints = {}
+	for _, descendant in ipairs(character:GetDescendants()) do
+		if isAnimationConstraint(descendant) and animationConstraintTouchesLeftArm(descendant) then
+			table.insert(constraints, descendant)
+		end
+	end
+	return constraints
+end
+
+local function restoreLeftArmAnimationConstraints(character)
+	for _, descendant in ipairs(character:GetDescendants()) do
+		if isAnimationConstraint(descendant) and descendant:GetAttribute(GRIP_ATTR) then
+			descendant.Enabled = descendant:GetAttribute(GRIP_WAS_ENABLED_ATTR) == true
+			descendant:SetAttribute(GRIP_ATTR, nil)
+			descendant:SetAttribute(GRIP_WAS_ENABLED_ATTR, nil)
+		end
+	end
+end
+
+local function clearLeftHandGrip(character)
+	if not character then return end
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		local existingIK = humanoid:FindFirstChild("LeftHandIK")
+		if existingIK then existingIK:Destroy() end
+	end
+
+	local leftHand = character:FindFirstChild("LeftHand")
+	if leftHand then
+		local existingAlign = leftHand:FindFirstChild("LeftHandGripAlign")
+		if existingAlign then existingAlign:Destroy() end
+		local existingAttachment = leftHand:FindFirstChild("LeftHandGripAttachment")
+		if existingAttachment then existingAttachment:Destroy() end
+	end
+
+	restoreLeftArmAnimationConstraints(character)
+end
+
+-- Pin a character's LeftHand to the Tool's LeftGrip Attachment. Modern Roblox
+-- Avatar-Joint-Upgrade rigs use AnimationConstraint + BallSocketConstraint
+-- joints instead of Motor6Ds, so IKControl is inert there; those rigs use an
+-- AlignPosition pull while temporarily pausing the left arm animation drivers.
+-- Legacy Motor6D rigs fall back to IKControl. Everything is server-created so
+-- the grip replicates to every viewer: local first-person, third-party
+-- observers, and NPC viewers all see the same two-hand grip.
 -- (#39) Previous implementation was client-only in ViewmodelController,
 -- which left NPCs and other players' characters with the off-hand hanging
 -- at the side.
 --
 -- No-op for single-handed weapons (Pistol / Knife — no LeftGrip Attachment).
--- ChainRoot = UpperTorso so the IK solver has shoulder + elbow + wrist (3
--- joints) of reach; LeftUpperArm-only chains can't bring the hand across
--- the chest to the foregrip.
 function WeaponMeshes.attachLeftHandIK(character, tool)
 	if not character or not tool then return nil end
 
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if not humanoid then return nil end
-	if not humanoid:FindFirstChildOfClass("Animator") then
-		local animator = Instance.new("Animator")
-		animator.Parent = humanoid
-	end
 
-	-- Tear down any prior IK from the previous weapon. Do this BEFORE the
+	-- Tear down any prior grip from the previous weapon. Do this BEFORE the
 	-- single-handed early-return so swapping from a two-handed to a
 	-- single-handed weapon correctly clears the off-hand grip.
-	local existing = humanoid:FindFirstChild("LeftHandIK")
-	if existing then existing:Destroy() end
+	clearLeftHandGrip(character)
 
 	local handle = tool:FindFirstChild("Handle")
 	if not handle then return nil end
@@ -290,6 +358,65 @@ function WeaponMeshes.attachLeftHandIK(character, tool)
 	local upperTorso = character:FindFirstChild("UpperTorso")
 	if not leftHand or not upperTorso then return nil end
 
+	local animationConstraints = getLeftArmAnimationConstraints(character)
+	if #animationConstraints > 0 then
+		for _, constraint in ipairs(animationConstraints) do
+			constraint:SetAttribute(GRIP_WAS_ENABLED_ATTR, constraint.Enabled == true)
+			constraint:SetAttribute(GRIP_ATTR, true)
+			constraint.Enabled = false
+		end
+
+		local handAttachment = Instance.new("Attachment")
+		handAttachment.Name = "LeftHandGripAttachment"
+		handAttachment.Parent = leftHand
+
+		local align = Instance.new("AlignPosition")
+		align.Name = "LeftHandGripAlign"
+		align.Attachment0 = handAttachment
+		align.Attachment1 = leftGrip
+		align.RigidityEnabled = true
+		align.MaxForce = 100000
+		align.Responsiveness = 200
+		align.Parent = leftHand
+
+		local destroyingConn
+		local ancestryConn
+		local function disconnect()
+			if destroyingConn then
+				destroyingConn:Disconnect()
+				destroyingConn = nil
+			end
+			if ancestryConn then
+				ancestryConn:Disconnect()
+				ancestryConn = nil
+			end
+		end
+		local function clearAlignGrip()
+			if align.Parent ~= leftHand and handAttachment.Parent ~= leftHand then
+				disconnect()
+				return
+			end
+			disconnect()
+			clearLeftHandGrip(character)
+		end
+
+		destroyingConn = tool.Destroying:Connect(clearAlignGrip)
+		ancestryConn = tool.AncestryChanged:Connect(function()
+			if tool.Parent ~= character then
+				clearAlignGrip()
+			end
+		end)
+
+		return align
+	end
+
+	if not humanoid:FindFirstChildOfClass("Animator") then
+		local animator = Instance.new("Animator")
+		animator.Parent = humanoid
+	end
+
+	-- Legacy Motor6D rigs still support IKControl. ChainRoot = UpperTorso gives
+	-- the solver shoulder + elbow + wrist reach.
 	local ik = Instance.new("IKControl")
 	ik.Name = "LeftHandIK"
 	ik.Type = Enum.IKControlType.Position
@@ -300,15 +427,31 @@ function WeaponMeshes.attachLeftHandIK(character, tool)
 	ik.SmoothTime = 0  -- LeftGrip is rigidly welded to RightHand; no smoothing needed
 	ik.Parent = humanoid
 
-	local function clearIK()
-		if ik.Parent then
-			ik:Destroy()
+	local destroyingConn
+	local ancestryConn
+	local function disconnect()
+		if destroyingConn then
+			destroyingConn:Disconnect()
+			destroyingConn = nil
+		end
+		if ancestryConn then
+			ancestryConn:Disconnect()
+			ancestryConn = nil
 		end
 	end
-	tool.Destroying:Connect(clearIK)
-	tool.AncestryChanged:Connect(function()
+	local function clearIKGrip()
+		if ik.Parent ~= humanoid then
+			disconnect()
+			return
+		end
+		disconnect()
+		clearLeftHandGrip(character)
+	end
+
+	destroyingConn = tool.Destroying:Connect(clearIKGrip)
+	ancestryConn = tool.AncestryChanged:Connect(function()
 		if tool.Parent ~= character then
-			clearIK()
+			clearIKGrip()
 		end
 	end)
 
