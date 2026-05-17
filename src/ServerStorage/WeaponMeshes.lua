@@ -206,7 +206,13 @@ local TYPE_TO_BUILDER = {
 -- crosses the torso. Keep two-handed targets near the right-hand grip so the
 -- visible bug is fixed first; a proper AnimationConstraint pose solver can move
 -- these forward later.
-local REAR_TWO_HAND_GRIP_OFFSET = Vector3.new(0.6, -0.3, -0.3)
+-- X is negative because the off-hand naturally rests on the body's left side
+-- (Handle local +X = gun's right side, which is where RightHand already is).
+-- Positive X put the target across the body, doubling the unreachable distance
+-- — verified in Studio: +X → 2-4 stud LH-LG gap; -X → ~1.4 stud (still constraint
+-- limited, but the best the AlignPosition workaround can hit on Avatar-Joint-Upgrade
+-- rigs; #51 tracks the proper AnimationConstraint pose solver).
+local REAR_TWO_HAND_GRIP_OFFSET = Vector3.new(-0.6, -0.3, -0.3)
 local LEFT_GRIP_OFFSET = {
 	SMG     = REAR_TWO_HAND_GRIP_OFFSET,
 	Rifle   = REAR_TWO_HAND_GRIP_OFFSET,
