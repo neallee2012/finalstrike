@@ -5,11 +5,10 @@
 -- the arm parts to 0 each frame so the player sees their own hands holding
 -- the gun.
 --
--- The off-hand IK that pins LeftHand to the weapon's LeftGrip Attachment is
--- now created on the server (WeaponMeshes.attachLeftHandIK, called from
--- MatchManager.attachWeapon + NPCSystem). Server-side IKControl replicates
--- to every viewer, so NPCs and other players also show two-hand grip — the
--- previous client-only setup left them gripping one-handed (#39).
+-- Server-side off-hand IK is currently disabled in WeaponMeshes (#56) because
+-- its rigid grip solver dragged character RootParts. This script only keeps
+-- the real character arms visible in first-person; it does not restore the
+-- two-hand pose.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")

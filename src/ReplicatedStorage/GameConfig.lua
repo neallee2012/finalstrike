@@ -171,6 +171,20 @@ GameConfig.ENEMIES = {
 	},
 }
 
+-- (#53) Training-arena NPC behavior profile. Live-match values (per-enemy
+-- Speed / DetectRange above) are untouched; these only apply when a Tool is
+-- spawned via NPCSystem.spawnDummyAt and stamped with IsTrainingDummy=true.
+-- The goal is "observable practice target", not "live combat at half speed":
+--   1) walk slowly so visuals are readable
+--   2) only react when the player is genuinely close — no across-arena aggro
+--   3) stay near the spawn marker (small patrol radius + leash on chase)
+-- AttackRate / AttackRange / HP / Damage stay at match values so combat is
+-- still meaningful once the player closes in.
+GameConfig.TRAINING_SPEED_MULTIPLIER = 0.3
+GameConfig.TRAINING_DETECT_RANGE    = 18   -- vs live 35-50; player must approach
+GameConfig.TRAINING_PATROL_RADIUS   = 6    -- vs live ±30; tight wander around home
+GameConfig.TRAINING_LEASH_RADIUS    = 20   -- abort chase if pulled past this from home
+
 -- Loot pickup values — Sprint 8b: 4-tier medkit ladder (200 HP rebalance).
 -- Weapon drops remain removed (weapons are shop-only).
 GameConfig.LOOT = {
