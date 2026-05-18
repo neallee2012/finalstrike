@@ -196,9 +196,9 @@ local TYPE_TO_BUILDER = {
 }
 
 -- Local position of the LeftGrip attachment (relative to Handle) per weapon Type.
--- WeaponMeshes.attachLeftHandIK (called server-side from MatchManager + NPCSystem)
--- drives the off-hand grip solver — every viewer sees two-hand grip including
--- NPCs and other players (#39).
+-- WeaponMeshes.attachLeftHandIK is still called server-side from MatchManager
+-- and NPCSystem, but the off-hand solver is disabled for now (#56). The active
+-- path only normalizes RightGrip orientation so guns do not point into the floor.
 -- Nil entries (Pistol, Knife) mean "single-handed, no IK".
 --
 -- Avatar-Joint-Upgrade rigs cannot currently reach true foregrip targets with
@@ -339,16 +339,10 @@ local function clearLeftHandGrip(character)
 	restoreLeftArmAnimationConstraints(character)
 end
 
--- Pin a character's LeftHand to the Tool's LeftGrip Attachment. Modern Roblox
--- Avatar-Joint-Upgrade rigs use AnimationConstraint + BallSocketConstraint
--- joints instead of Motor6Ds, so IKControl is inert there; those rigs use an
--- AlignPosition pull while temporarily pausing the left arm animation drivers.
--- Legacy Motor6D rigs fall back to IKControl. Everything is server-created so
--- the grip replicates to every viewer: local first-person, third-party
--- observers, and NPC viewers all see the same two-hand grip.
--- (#39) Previous implementation was client-only in ViewmodelController,
--- which left NPCs and other players' characters with the off-hand hanging
--- at the side.
+-- Attach-time weapon pose maintenance. The off-hand solver below is currently
+-- disabled (#56); the live path only resets the RightGrip weld rotation. The
+-- old IK/AlignPosition implementation is left below the early return as
+-- reference for a future non-propulsive grip mechanism.
 --
 -- No-op for single-handed weapons (Pistol / Knife — no LeftGrip Attachment).
 function WeaponMeshes.attachLeftHandIK(character, tool)

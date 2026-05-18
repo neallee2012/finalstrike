@@ -138,9 +138,9 @@ function MatchManager.attachWeapon(player, weaponName)
 	-- and triggers the engine's grip + tool-hold animation.
 	tool.Parent = char
 
-	-- (#39) Wire the off-hand IK on the server so every viewer (including
-	-- other players and spectators) sees two-hand grip, not just the local
-	-- first-person view.
+	-- WeaponMeshes currently normalizes the RightGrip orientation here; the
+	-- off-hand IK path is disabled inside the module until a non-propulsive
+	-- grip mechanism replaces the old rigid solver (#56).
 	WeaponMeshes.attachLeftHandIK(char, tool)
 end
 

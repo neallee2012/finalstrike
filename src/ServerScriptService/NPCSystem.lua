@@ -162,7 +162,8 @@ local function createR15NPC(enemyType, position)
 		local tool = WeaponMeshes.build(weaponName)
 		if tool then
 			tool.Parent = model  -- Tool parented to character auto-equips and grips in RightHand
-			-- (#39) Server-side IK so all clients see the NPC two-hand grip.
+			-- Normalizes RightGrip orientation; off-hand IK is disabled in
+			-- WeaponMeshes until a non-propulsive grip mechanism exists (#56).
 			WeaponMeshes.attachLeftHandIK(model, tool)
 		end
 	end
