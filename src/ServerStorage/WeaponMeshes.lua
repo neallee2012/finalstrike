@@ -10,7 +10,6 @@
 -- polish sprint — fixes #9 (Stage 1 rename broke direct name lookup).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
 local GameConfig = require(ReplicatedStorage:WaitForChild("GameConfig"))
 
 local WeaponMeshes = {}
@@ -356,22 +355,30 @@ function WeaponMeshes.attachLeftHandIK(character, tool)
 	if not character or not tool then return nil end
 
 	-- (#56) Fix Avatar-Joint-Upgrade RightGripAttachment orientation. Modern
-	-- R15 rigs (Players:CreateHumanoidModelFromDescription output) set the
-	-- attachment's local CFrame to Rx(90) — its -Z (the "grip forward"
-	-- direction Roblox uses to align Handle) points along the fingers, which
-	-- is DOWN when the arm hangs at the side. Tool.Parent = character creates
-	-- a Weld with C0 = attachment.CFrame, so the gun's barrel inherits this
-	-- downward orientation and ends up pointing straight into the floor.
-	-- Previously the rigid-pin LeftHand IK was masking this — its kinematic
-	-- loop force-rotated the right arm into a horizontal pose. With IK
-	-- disabled (below), the bug surfaces. Reset Weld.C0 to identity rotation
-	-- while preserving the position offset. Handle.LookVector then tracks
+	-- R15 rigs (CreateHumanoidModelFromDescription output) set the attachment's
+	-- local CFrame to Rx(90) — its -Z (the "grip forward" direction Roblox
+	-- uses to align Handle) points along the fingers, which is DOWN when the
+	-- arm hangs at the side. Tool.Parent = character creates a Weld with
+	-- C0 = attachment.CFrame, so the gun's barrel inherits this downward
+	-- orientation and ends up pointing straight into the floor. Previously
+	-- the rigid-pin LeftHand IK was masking this — its kinematic loop
+	-- force-rotated the right arm into a horizontal pose. With IK disabled
+	-- (below), the bug surfaces. Reset Weld.C0 to identity rotation while
+	-- preserving the position offset; Handle.LookVector then tracks
 	-- RightHand.LookVector, so the gun follows the animation pose naturally.
-	local rh = character:FindFirstChild("RightHand")
-	local weld = rh and rh:FindFirstChild("RightGrip")
-	if weld then
-		weld.C0 = CFrame.new(weld.C0.Position)
-	end
+	--
+	-- The Weld is created by Roblox's Tool grip machinery; in practice it's
+	-- present immediately after Tool.Parent = character on the same frame,
+	-- but defensive bounded WaitForChild handles the (rare) deferred case
+	-- without silently skipping the reset.
+	task.spawn(function()
+		local rh = character:WaitForChild("RightHand", 2)
+		if not rh then return end
+		local weld = rh:WaitForChild("RightGrip", 2)
+		if weld and weld:IsA("Weld") then
+			weld.C0 = CFrame.new(weld.C0.Position)
+		end
+	end)
 
 	-- (#56) Disable server-side LeftHand IK entirely. On modern Avatar-Joint-Upgrade
 	-- rigs, AlignPosition.RigidityEnabled=true creates a closed kinematic loop
@@ -385,12 +392,15 @@ function WeaponMeshes.attachLeftHandIK(character, tool)
 	-- pin the hand 2.2 studs from the LeftGrip regardless of MaxForce (1k–50k
 	-- all measured the same gap). The rigid pin is the only path that closes
 	-- that distance, and it's also the only path that causes the drag.
-	-- Trade-off: NPCs and other players' characters lose the two-hand grip
-	-- visual (LeftHand hangs at side) — the original PR #39 intent. Acceptable
-	-- because RootPart drift is gameplay-breaking. Re-enable when we have a
-	-- non-propulsive grip mechanism (custom animation, or anchor-style pin).
-	-- ViewmodelController's first-person viewmodel IK is unaffected (cosmetic
-	-- model separate from the actual character).
+	-- Trade-off: ALL characters lose the two-hand grip visual — NPCs, other
+	-- players in third-person, AND the local player's first-person view of
+	-- their own arms. ViewmodelController only forces real character arms
+	-- visible in first-person (no separate cosmetic viewmodel rig), so when
+	-- the server IK is disabled the local view loses the off-hand pose too.
+	-- Accepted because the RootPart drift / NPC propulsion this caused was
+	-- gameplay-breaking. Re-enable when we have a non-propulsive grip
+	-- mechanism (custom animation, or an anchor-style pin that doesn't
+	-- close the kinematic chain).
 	if true then return nil end
 	-- luacheck: ignore (rest kept for reference / future re-enable)
 

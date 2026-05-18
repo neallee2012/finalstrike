@@ -358,6 +358,9 @@ local function runNPCAI(npcModel)
 	npcModel:GetAttributeChangedSignal("HP"):Connect(function()
 		local hp = npcModel:GetAttribute("HP")
 		if hp <= 0 and npcModel:GetAttribute("State") ~= "Dead" then
+			if npcModel:GetAttribute("IsTrainingDummy") then
+				return
+			end
 			npcModel:SetAttribute("State", "Dead")
 			dropLoot(npcModel)
 
@@ -521,11 +524,11 @@ function NPCSystem.cleanup()
 end
 
 -- ============ TRAINING DUMMIES ============
--- Stationary practice targets that auto-respawn 3s after death. They use the
--- same R15 builder as combat NPCs (so they take damage via the HP attribute
--- chain in MatchManager.FireWeapon) but skip runNPCAI — no chase, no attack,
--- no patrol. Tracked separately from activeNPCs so the LOBBY-phase cleanup
--- doesn't sweep them away.
+-- Practice targets that auto-respawn 3s after death. They use the same R15
+-- builder as combat NPCs (so they take damage via the HP attribute chain in
+-- MatchManager.FireWeapon), but run with a training-specific movement profile.
+-- Tracked separately from activeNPCs so the LOBBY-phase cleanup doesn't sweep
+-- them away.
 
 local activeDummies = {}  -- list of NPC models currently in TrainingArena
 
