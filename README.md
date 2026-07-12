@@ -19,7 +19,7 @@ A 12-player survival shooter for Roblox. PvE loot phase → PvP elimination.
 - **GameConfig.lua** - Shared match, weapon, NPC, economy, and quest configuration
 - **GameEventsBootstrap.lua** - Runtime `GameEvents` RemoteEvent/RemoteFunction creation
 - **MatchManager.lua** - Lobby → PvE → PvP → Match End flow, player health, ammo, and weapon validation
-- **MapBuilder.lua** - Procedural Last Zone lobby, arena, spectator area, and training arena
+- **MapBuilder.lua / LobbyBuilder.lua** - Procedural Last Zone orchestration and the six-bay industrial bunker lobby
 - **NPCSystem.lua** - R15 NPC spawning, AI, combat, training dummies, and loot drops
 - **LootSystem.lua** - Ammo, medkit, and coin pickups
 - **CurrencyService.lua / ShopService.lua** - BulletCoin persistence and 30-weapon ownership/loadout

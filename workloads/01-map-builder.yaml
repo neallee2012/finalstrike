@@ -1,11 +1,11 @@
 name: MapBuilder
 owner: claude-code
 priority: P0-prototype
-status: ⚠️ FUNCTIONAL (core map complete; issue #55 industrial bunker hub parity open)
+status: VERIFIED (industrial bunker hub implemented; 20/20 parity rubric and runtime gates passed)
 current_state:
-  functional: "Lobby, StartMatchPad, arena, spectator area, and remote training arena are implemented."
-  visual_baseline: "FINAL STRIKE banner, Gun Shop pedestal, Training portal, and Classic Teams panel exist."
-  open_issue: "#55 still requires the full three-zone bunker layout, interactive shop display, Crisis entrance, and polish."
+  functional: "Lobby, invisible central-door StartMatchPad, arena, spectator area, and remote training arena are implemented."
+  visual_baseline: "The 180x80x28 lobby has a 30-stud central aisle, FINAL STRIKE destination, six recessed bays, local bunker lighting, fictional weapon displays, and sparse industrial props."
+  integration_contract: "Keep workspace.LastZone.Lobby/{LobbySpawn,StartMatchPad,TrainingArenaPortal} as direct children; keep TrainingArena/{TrainingEntry,TrainingExitPad,DummySpawns} unchanged."
 stages:
   - define: 地圖結構設計 (Last Zone)
   - implement: 大廳 + 啟動台
@@ -14,14 +14,23 @@ stages:
   - implement: 燈光氛圍 (夜間/紅光/霧氣/Bloom)
   - verify: 進入 Studio → Play → 大廳走動 → 踩啟動台傳送
 success_criteria:
-  - 大廳有 FINAL STRIKE 標題牌與基礎功能分區
-  - 啟動台可觸發（1人測試）
+  - 大廳為 180x80x28 工業碉堡，中央走道寬 30 studs
+  - 六個 recessed bays 的位置、招牌、紅色門框與展示 cue 符合 authoritative reference
+  - FINAL STRIKE 中央門內的透明 StartMatchPad 可觸發正常比賽 lifecycle
+  - TrainingArenaPortal 進出、LobbySpawn 返回、ShopUI (B)、DailyQuestUI (Q) 保持可用
   - 競技場有 12+ 掩體
   - 觀戰區有 4 個練習靶
-  - 夜間氛圍 + 紅色警示燈 + 霧氣
-  - "#55 的 90% 參考圖相似度仍待實際參考圖與分階段驗收"
+  - hub 使用 local 白光與紅色 neon 保持暗色電影感，不犧牲 arena 可讀性
+  - 20 項 visual parity rubric 至少 18/20，且 layout/integration hard gates 全數通過
+  - focused Studio client FPS >= 50；Lobby <= 320 BaseParts / 20 Lights / 12 SurfaceGuis
 artifacts:
   - src/ServerScriptService/MapBuilder.lua
+  - src/ServerScriptService/LobbyBuilder.lua
+  - receipts/issue-55-industrial-bunker-lobby.md
+verification:
+  studio_place: "最後一擊 (PlaceId 76520783469506, GameId 10086488941)"
+  result: "20/20 rubric; 225 BaseParts, 362 descendants, 20 Lights, 12 SurfaceGuis; 59.37 focused client FPS over 300 frames."
+  integrations: "StartMatchPad reached PvE; TrainingArenaPortal round trip returned to LobbySpawn; ShopUI B and DailyQuestUI Q remained usable."
 recovery:
-  - 燈光太暗 → 調 Lighting.Brightness / Ambient
+  - hub 燈光太暗 → 優先調 LobbyBuilder local fixtures，不降低 arena 可讀性
   - 掩體穿模 → 確認 Anchored=true + 位置不重疊
