@@ -28,13 +28,13 @@ Backfilled by: claude-code (Sprint 8a 衛生補課)
 
 ### FPS 視角（commits 3db2349, 78c4b9f, ab5a601, 9829d65, 6997184）
 - [x] CameraController（130 行）— PvE/PvPWarning/PvP 鎖第一人稱 + LockCenter；大廳 / Match End / 觀戰 釋放
-- [x] ViewmodelController（94 行）— 強制 6 個 arm parts 可見 + LeftHand IK pin 到 Tool.Handle.LeftGrip
+- [x] ViewmodelController / FirstPersonViewmodel — non-physical 第三人稱雙手 pose + local camera Motor6D 雙手武器 rig
 - [x] crosshair 4-segment open-center 完成（commit d054043 — CEO spec）
 - [x] crosshair 在自己的 ScreenGui FinalStrikeCrosshair 隔離（reviewer #13 要求）
 - [x] crosshair 在大廳 / 觀戰 / UI 開啟時隱藏（commit 9829d65）
 - [x] 觀戰 camera fix（commit 78c4b9f — 被淘汰玩家切第三人稱）
 - [x] right-click work in third-person（commit ab5a601 — release MouseBehavior 機制）
-- [x] IK Priority 1000 防 jump 時手脫離武器（commit 78c4b9f — fix #12）
+- [x] #39 以 persistent non-physical R15 pose 取代舊 IK priority，jump/freefall 不脫手且不產生 #56 physics drift
 - [x] IK survives jump（同上）
 
 ### NPC 武器與射擊視覺（commit 253863f, 6236dc1）

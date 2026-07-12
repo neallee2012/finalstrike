@@ -196,10 +196,10 @@ local TYPE_TO_BUILDER = {
 }
 
 -- Local position of the LeftGrip attachment (relative to Handle) per weapon Type.
--- WeaponMeshes.attachLeftHandIK is still called server-side from MatchManager
--- and NPCSystem, but the off-hand solver is disabled for now (#56). The active
--- path only normalizes RightGrip orientation so guns do not point into the floor.
--- Nil entries (Pistol, Knife) mean "single-handed, no IK".
+-- ViewmodelController consumes these attachments on every client to select the
+-- non-physical TwoHandHold pose. The old server solver stays disabled (#56);
+-- attachLeftHandIK only normalizes RightGrip orientation. Nil entries (Pistol,
+-- Knife) mean "single-handed".
 --
 -- Avatar-Joint-Upgrade rigs have a hard reach limit on the left arm:
 -- shoulder→LeftHand-center fully extended ≈ 1.86 studs. With the old
@@ -238,8 +238,7 @@ function WeaponMeshes.build(weaponName)
 	end
 	local model, handle = fn()
 
-	-- Add LeftGrip attachment for two-handed weapons so the server grip solver can
-	-- snap the character's LeftHand to it (visual: both hands gripping the gun).
+	-- Mark two-handed weapons for the client-side, non-physical hold pose.
 	local leftGripOffset = LEFT_GRIP_OFFSET[cfg.Type]
 	if leftGripOffset then
 		local leftGrip = Instance.new("Attachment")

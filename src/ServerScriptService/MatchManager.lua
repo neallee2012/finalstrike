@@ -18,6 +18,7 @@ local PlayerEliminated = events:WaitForChild("PlayerEliminated")
 local KillFeed = events:WaitForChild("KillFeed")
 local AmmoUpdate = events:WaitForChild("AmmoUpdate")
 local ReloadStateChanged = events:WaitForChild("ReloadStateChanged")
+local RELOAD_POSE_ATTRIBUTE = "FinalStrikeReloading"
 
 -- Per-shot [Fire] debug logging. Auto weapons fire ~12 shots/sec and shotguns
 -- log per pellet, so this is OFF by default to avoid flooding the console
@@ -48,6 +49,12 @@ local function pushAmmoState(player, data)
 	local config = GameConfig.WEAPONS[data.Weapon]
 	local magSize = (config and config.MagSize) or 0
 	AmmoUpdate:FireClient(player, data.Ammo or 0, data.ReserveAmmo or 0, magSize)
+end
+
+local function setReloadPoseState(player, active)
+	if player.Parent == Players then
+		player:SetAttribute(RELOAD_POSE_ATTRIBUTE, active == true)
+	end
 end
 
 -- Reward helper: routes through CurrencyService (which enforces per-match caps)
@@ -118,6 +125,7 @@ function MatchManager.initPlayerData(player)
 	local healthUpdate = events:WaitForChild("HealthUpdate")
 	healthUpdate:FireClient(player, GameConfig.MAX_HP, GameConfig.MAX_HP)
 	pushAmmoState(player, playerData[player])
+	setReloadPoseState(player, false)
 	ReloadStateChanged:FireClient(player, false, 0, equipped)
 	events:WaitForChild("EquipWeapon"):FireClient(player, equipped)
 end
@@ -129,17 +137,23 @@ end
 
 local function pushReloadState(player, active, duration, weaponName)
 	if player.Parent == Players then
+		setReloadPoseState(player, active)
 		ReloadStateChanged:FireClient(player, active, duration or 0, weaponName)
 	end
 end
 
 function MatchManager.cancelReload(player)
 	local data = playerData[player]
-	if not data then return false end
+	if not data then
+		setReloadPoseState(player, false)
+		return false
+	end
 
 	local wasReloading = ReloadLogic.cancel(data)
 	if wasReloading then
 		pushReloadState(player, false, 0, data.Weapon)
+	else
+		setReloadPoseState(player, false)
 	end
 	return wasReloading
 end

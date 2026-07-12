@@ -162,8 +162,8 @@ _隨開發進度持續更新_
 
 ### Sprint 8 補充（補檔 2026-05-03，詳見 receipts/sprint-8-shop-economy-fps.md）
 - **武器 raycast origin 改用 camera viewport center 而非 Muzzle.WorldPosition**：Sprint 7 從 muzzle 發射雖然「視覺合理」但與螢幕中心 crosshair 不對齊（muzzle 在槍身右側 → bullet 飄）。Sprint 8 改回 camera center + crosshair-aligned direction（推翻 Sprint 7 的「camera→muzzle」決定，issue #5/6/7）
-- **FPS LockFirstPerson 隱藏所有 body parts**：CameraScript 設 `LocalTransparencyModifier=1` 在所有 body parts 上 → 玩家看不到自己的手。每 frame `RenderStepped` 強制 6 個 arm parts (Left/Right Upper/Lower/Hand) `LocalTransparencyModifier=0` 才能可見
-- **LeftHand IK 必須 Priority 1000**：默認 priority 會被 jump animation 的 LeftArm track 蓋掉，玩家跳起時左手會脫離武器（issue #12）
+- **FPS 用 local camera ViewModel，不顯示真實手臂**：`FirstPersonViewmodel` 在 `CurrentCamera` 下 clone 左右 R15 Hand + Tool mesh，以 Motor6D 每個 `RenderStepped` 跟 camera；真實本機手臂/Tool 只用 `LocalTransparencyModifier=1` 隱藏，其他玩家仍看到第三人稱角色
+- **第三人稱雙手姿勢必須 persistent、non-physical**：`ViewmodelController` 在每個 client 用 `R15Pose.SetPersistentPose(TwoHandHold)` 維持 jump/freefall 姿勢；reload 期間由 server-owned `FinalStrikeReloading` 暫停。不可恢復 AlignPosition/IK rigid pin，否則會重現 #56 RootPart 漂移/彈飛
 - **MouseBehavior LockCenter 過渡時要強制 Default 一段時間**：`CameraMode = Classic` 後，內建 CameraScript 仍會延續 LockCenter 數 frames。退出第一人稱時設 `releaseEnforceUntil = tick() + 1.0`，`RenderStepped` 在這 1 秒內持續強制 Default，否則鼠標被搶回 LockCenter，shop / 觀戰點不到 UI（issue #14, #15）
 - **Interactive UI 開啟時必須臨時釋放 MouseBehavior**：LockCenter 會吞掉 click，shop / daily-quest UI 開啟期間要切回 Default 才能點 UI 按鈕。連 GUI Enabled signal 偵測比監聽整個 InputService 更便宜
 - **Crosshair 必須在自己的 ScreenGui**：HUD 主 ScreenGui 隱藏時 crosshair 也跟著隱藏 → 不該。隔離成獨立 ScreenGui (`FinalStrikeCrosshair`) 才能獨立控制（reviewer #13 要求）

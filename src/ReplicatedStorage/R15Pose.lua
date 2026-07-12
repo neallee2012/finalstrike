@@ -43,11 +43,11 @@ end
 
 R15Pose.Poses = {
 	TwoHandHold = {
-		RightShoulder = angles(-55, 0, 10),
-		RightElbow = angles(-25, 0, 0),
-		LeftShoulder = angles(-65, -10, -25),
-		LeftElbow = angles(-55, 0, 0),
-		LeftWrist = angles(0, 15, 0),
+		RightShoulder = angles(-6, -23, -9),
+		RightElbow = angles(1, -25, -54),
+		LeftShoulder = angles(64, -65, 0),
+		LeftElbow = angles(60, 0, 59),
+		LeftWrist = angles(46, 3, -65),
 	},
 	NPCAim = {
 		RightShoulder = angles(-75, 0, 5),
@@ -94,6 +94,7 @@ function R15Pose.new(character)
 		Target = {},
 		BlendSpeed = math.huge,
 		BlendRemaining = 0,
+		Persistent = false,
 		Active = false,
 		Destroyed = false,
 	}, Controller)
@@ -130,7 +131,7 @@ function R15Pose.new(character)
 			end
 		end
 		self.BlendRemaining = math.max(0, self.BlendRemaining - dt)
-		self.Active = self.BlendRemaining > 0
+		self.Active = self.Persistent or self.BlendRemaining > 0
 	end)
 
 	self.AncestryConnection = character.AncestryChanged:Connect(function(_, parent)
@@ -144,13 +145,35 @@ function Controller:IsSupported()
 	return self.Joints.RightShoulder ~= nil and self.Joints.LeftShoulder ~= nil
 end
 
-function Controller:SetPose(pose, blendTime)
+local function setPoseTarget(self, pose, blendTime)
 	if self.Destroyed then return end
 	self.BlendRemaining = math.max(blendTime or 0, 0)
 	self.BlendSpeed = self.BlendRemaining > 0 and (5 / self.BlendRemaining) or math.huge
 	self.Active = true
 	for name in pairs(self.Joints) do
 		self.Target[name] = pose[name] or CFrame.new()
+	end
+end
+
+function Controller:SetPose(pose, blendTime)
+	self.Persistent = false
+	setPoseTarget(self, pose, blendTime)
+end
+
+function Controller:SetPersistentPose(pose, blendTime)
+	self.Persistent = true
+	setPoseTarget(self, pose, blendTime)
+end
+
+function Controller:Stop()
+	if self.Destroyed then return end
+	self.Persistent = false
+	self.Active = false
+	self.BlendRemaining = 0
+	for name, joint in pairs(self.Joints) do
+		self.Current[name] = CFrame.new()
+		self.Target[name] = CFrame.new()
+		if joint.Parent then joint.Transform = CFrame.new() end
 	end
 end
 

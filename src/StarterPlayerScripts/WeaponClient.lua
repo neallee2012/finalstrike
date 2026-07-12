@@ -15,6 +15,7 @@ local camera = workspace.CurrentCamera
 
 local GameConfig = require(ReplicatedStorage:WaitForChild("GameConfig"))
 local R15Pose = require(ReplicatedStorage:WaitForChild("R15Pose"))
+local ViewmodelState = require(ReplicatedStorage:WaitForChild("ViewmodelState"))
 local events = ReplicatedStorage:WaitForChild("GameEvents")
 
 local FireWeapon = events:WaitForChild("FireWeapon")
@@ -299,7 +300,8 @@ local function fireWeapon()
 
 	-- Local muzzle flash for the local player (server's WeaponHit handles the
 	-- impact spark; this is the gun-end of the shot).
-	spawnMuzzleFlash(muzzle)
+	spawnMuzzleFlash(ViewmodelState.GetActiveMuzzle() or muzzle)
+	ViewmodelState.EmitRecoil(config.Type)
 
 	if config.Type == "Knife" then
 		-- Melee: short range check
