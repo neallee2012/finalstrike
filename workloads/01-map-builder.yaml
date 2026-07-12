@@ -1,7 +1,11 @@
 name: MapBuilder
 owner: claude-code
 priority: P0-prototype
-status: ✅ DONE (Sprint 1)
+status: ⚠️ FUNCTIONAL (core map complete; issue #55 industrial bunker hub parity open)
+current_state:
+  functional: "Lobby, StartMatchPad, arena, spectator area, and remote training arena are implemented."
+  visual_baseline: "FINAL STRIKE banner, Gun Shop pedestal, Training portal, and Classic Teams panel exist."
+  open_issue: "#55 still requires the full three-zone bunker layout, interactive shop display, Crisis entrance, and polish."
 stages:
   - define: 地圖結構設計 (Last Zone)
   - implement: 大廳 + 啟動台
@@ -10,11 +14,12 @@ stages:
   - implement: 燈光氛圍 (夜間/紅光/霧氣/Bloom)
   - verify: 進入 Studio → Play → 大廳走動 → 踩啟動台傳送
 success_criteria:
-  - 大廳有 FINAL STRIKE 標題牌
+  - 大廳有 FINAL STRIKE 標題牌與基礎功能分區
   - 啟動台可觸發（1人測試）
   - 競技場有 12+ 掩體
   - 觀戰區有 4 個練習靶
   - 夜間氛圍 + 紅色警示燈 + 霧氣
+  - "#55 的 90% 參考圖相似度仍待實際參考圖與分階段驗收"
 artifacts:
   - src/ServerScriptService/MapBuilder.lua
 recovery:

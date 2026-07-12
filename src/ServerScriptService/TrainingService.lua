@@ -117,6 +117,9 @@ local function tryExitTraining(player, source)
 		return
 	end
 
+	local mm = _G.MatchManager
+	if mm then mm.cancelReload(player) end
+
 	-- Destroy equipped Tool before teleport — lobby is gun-less per #38.
 	local char = player.Character
 	if char then
@@ -146,11 +149,14 @@ events:WaitForChild("SelectTrainingWeapon").OnServerEvent:Connect(function(playe
 	end
 	local data = mm.getPlayerData(player)
 	if data then
+		mm.cancelReload(player)
 		data.Weapon = weaponName
 		data.Eliminated = false
 		local cfg = GameConfig.WEAPONS[weaponName]
-		data.Ammo = (cfg and cfg.MagSize) or data.Ammo
-		events.AmmoUpdate:FireClient(player, data.Ammo, (cfg and cfg.MagSize) or data.Ammo)
+		local magSize = (cfg and cfg.MagSize) or 0
+		data.Ammo = magSize
+		data.ReserveAmmo = magSize * GameConfig.STARTING_RESERVE_MAGAZINES
+		mm.syncAmmoState(player)
 	end
 	mm.attachWeapon(player, weaponName)
 	events.EquipWeapon:FireClient(player, weaponName)

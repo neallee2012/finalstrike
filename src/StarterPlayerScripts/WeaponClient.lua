@@ -7,16 +7,19 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
+local ContentProvider = game:GetService("ContentProvider")
 
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
 local camera = workspace.CurrentCamera
 
 local GameConfig = require(ReplicatedStorage:WaitForChild("GameConfig"))
+local R15Pose = require(ReplicatedStorage:WaitForChild("R15Pose"))
 local events = ReplicatedStorage:WaitForChild("GameEvents")
 
 local FireWeapon = events:WaitForChild("FireWeapon")
 local ReloadWeapon = events:WaitForChild("ReloadWeapon")
+local ReloadStateChanged = events:WaitForChild("ReloadStateChanged")
 
 -- Look up the equipped weapon Tool's Muzzle attachment on the local character.
 -- Returns nil if no Tool equipped or muzzle missing (e.g. first frame before
@@ -58,19 +61,201 @@ local currentWeapon = GameConfig.STARTER_WEAPONS[1]
 local canFire = true
 local isReloading = false
 local isFiring = false
+local currentAmmo = 0
+local reserveAmmo = 0
+local magSize = 0
+local reloadTrack = nil
+local reloadAnimation = nil
+local reloadPoseController = nil
+local reloadGeneration = 0
+local warnedReloadAnimationIds = {}
+local warnedUnsupportedReloadPose = false
+
+local RELOAD_POSE_PHASES = {
+	{ Fraction = 0, Pose = R15Pose.Poses.ReloadEject },
+	{ Fraction = 0.35, Pose = R15Pose.Poses.ReloadInsert },
+	{ Fraction = 0.7, Pose = R15Pose.Poses.ReloadRack },
+	{ Fraction = 0.9 },
+}
+
+local function stopReloadAnimation()
+	reloadGeneration += 1
+	if reloadTrack then
+		reloadTrack:Stop(0.1)
+		reloadTrack:Destroy()
+		reloadTrack = nil
+	end
+	if reloadAnimation then
+		reloadAnimation:Destroy()
+		reloadAnimation = nil
+	end
+	if reloadPoseController then
+		reloadPoseController:Destroy()
+		reloadPoseController = nil
+	end
+end
+
+local function warnReloadAnimationOnce(animationId, reason)
+	if warnedReloadAnimationIds[animationId] then return end
+	warnedReloadAnimationIds[animationId] = true
+	warn(("Reload animation %d unavailable (%s); using procedural fallback")
+		:format(animationId, reason))
+end
+
+task.spawn(function()
+	for _, animationId in pairs(GameConfig.RELOAD_ANIMATION_IDS or {}) do
+		if type(animationId) == "number" and animationId > 0 then
+			local animation = Instance.new("Animation")
+			animation.AnimationId = "rbxassetid://" .. animationId
+			local loaded, loadError = pcall(function()
+				ContentProvider:PreloadAsync({ animation })
+			end)
+			animation:Destroy()
+			if not loaded then
+				warnReloadAnimationOnce(animationId, tostring(loadError))
+			end
+		end
+	end
+end)
+
+local function playProceduralReload(duration, character, generation)
+	if reloadGeneration ~= generation then return end
+
+	local controller = R15Pose.new(character)
+	if not controller:IsSupported() then
+		controller:Destroy()
+		if not warnedUnsupportedReloadPose then
+			warnedUnsupportedReloadPose = true
+			warn("Procedural reload pose requires an R15 character with both shoulder joints")
+		end
+		return
+	end
+
+	reloadPoseController = controller
+	duration = math.max(duration, 0.1)
+	local blendTime = math.min(0.12, duration * 0.1)
+	controller:SetPose(RELOAD_POSE_PHASES[1].Pose, blendTime)
+
+	task.spawn(function()
+		local previousFraction = 0
+		for index = 2, #RELOAD_POSE_PHASES do
+			local phase = RELOAD_POSE_PHASES[index]
+			task.wait(duration * (phase.Fraction - previousFraction))
+			previousFraction = phase.Fraction
+
+			if reloadGeneration ~= generation or reloadPoseController ~= controller then
+				return
+			end
+			if phase.Pose then
+				controller:SetPose(phase.Pose, blendTime)
+			else
+				controller:Reset(blendTime)
+			end
+		end
+	end)
+end
+
+local function playReloadAnimation(duration, weaponName)
+	stopReloadAnimation()
+	local generation = reloadGeneration
+
+	local config = GameConfig.WEAPONS[weaponName]
+	local animationId = config
+		and GameConfig.RELOAD_ANIMATION_IDS
+		and GameConfig.RELOAD_ANIMATION_IDS[config.Type]
+
+	local character = player.Character
+	if not character then return end
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
+	if type(animationId) ~= "number" or animationId <= 0 or not animator then
+		playProceduralReload(duration, character, generation)
+		return
+	end
+
+	local animation = Instance.new("Animation")
+	animation.AnimationId = "rbxassetid://" .. animationId
+	local loaded, trackOrError = pcall(function()
+		return animator:LoadAnimation(animation)
+	end)
+	if not loaded then
+		animation:Destroy()
+		warnReloadAnimationOnce(animationId, tostring(trackOrError))
+		playProceduralReload(duration, character, generation)
+		return
+	end
+
+	local track = trackOrError
+	track.Priority = Enum.AnimationPriority.Action4
+	track.Looped = false
+
+	reloadAnimation = animation
+	reloadTrack = track
+	-- Start paused so asset-loading latency does not consume the reload clip.
+	track:Play(0.1, 1, 0)
+
+	-- Animation length can be zero until the asset finishes loading. Wait a
+	-- bounded number of frames, then fit the clip to the authoritative duration.
+	task.spawn(function()
+		local startedAt = os.clock()
+		for _ = 1, 60 do
+			if reloadGeneration ~= generation or reloadTrack ~= track or track.Length > 0 then
+				break
+			end
+			RunService.Heartbeat:Wait()
+		end
+		if reloadGeneration ~= generation or reloadTrack ~= track then return end
+
+		if track.Length > 0 and duration > 0 then
+			track:AdjustSpeed(track.Length / duration)
+			return
+		end
+
+		track:Stop(0.05)
+		track:Destroy()
+		reloadTrack = nil
+		if reloadAnimation == animation then
+			animation:Destroy()
+			reloadAnimation = nil
+		end
+		warnReloadAnimationOnce(animationId, "asset did not load within 60 frames")
+		playProceduralReload(
+			math.max(duration - (os.clock() - startedAt), 0.1),
+			character,
+			generation
+		)
+	end)
+end
+
+local function setReloadState(active, duration, weaponName)
+	isReloading = active == true
+	canFire = not isReloading
+	if isReloading then
+		playReloadAnimation(duration or 0, weaponName or currentWeapon)
+	else
+		stopReloadAnimation()
+	end
+end
 
 -- Listen for weapon equip
 events:WaitForChild("EquipWeapon").OnClientEvent:Connect(function(weaponName)
 	if GameConfig.WEAPONS[weaponName] then
+		setReloadState(false, 0, weaponName)
 		currentWeapon = weaponName
 		canFire = true
-		isReloading = false
 	end
 end)
 
-events:WaitForChild("ReloadComplete").OnClientEvent:Connect(function()
-	isReloading = false
-	canFire = true
+ReloadStateChanged.OnClientEvent:Connect(setReloadState)
+
+events:WaitForChild("AmmoUpdate").OnClientEvent:Connect(function(magazine, reserve, maximum)
+	currentAmmo = magazine
+	reserveAmmo = reserve
+	magSize = maximum
+end)
+
+player.CharacterAdded:Connect(function()
+	setReloadState(false, 0, currentWeapon)
 end)
 
 local function fireWeapon()
@@ -78,6 +263,7 @@ local function fireWeapon()
 
 	local config = GameConfig.WEAPONS[currentWeapon]
 	if not config then return end
+	if config.Type ~= "Knife" and magSize > 0 and currentAmmo <= 0 then return end
 
 	local character = player.Character
 	if not character then return end
@@ -119,13 +305,13 @@ local function fireWeapon()
 		-- Melee: short range check
 		FireWeapon:FireServer(origin, direction, currentWeapon)
 		task.delay(config.AttackRate, function()
-			canFire = true
+			if not isReloading then canFire = true end
 		end)
 	else
 		-- Ranged weapon
 		FireWeapon:FireServer(origin, direction, currentWeapon)
 		task.delay(config.FireRate, function()
-			canFire = true
+			if not isReloading then canFire = true end
 		end)
 	end
 end
@@ -140,7 +326,9 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	end
 
 	if input.KeyCode == Enum.KeyCode.R then
-		if not isReloading then
+		if not isReloading and reserveAmmo > 0 and currentAmmo < magSize then
+			-- Block locally while waiting for the server's authoritative state
+			-- response. A rejected request receives ReloadStateChanged(false).
 			isReloading = true
 			canFire = false
 			ReloadWeapon:FireServer()

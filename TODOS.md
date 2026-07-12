@@ -1,6 +1,7 @@
 # TODOS
 
-Deferred items from `/plan-eng-review` of `pr-7-conflict-fix` (2026-05-10).
+Deferred items from `/plan-eng-review` of `pr-7-conflict-fix` (2026-05-10),
+reconciled against `main` on 2026-07-11.
 Each entry: **What / Why / Pros / Cons / Context / Depends on**.
 
 ---
@@ -59,33 +60,6 @@ Each entry: **What / Why / Pros / Cons / Context / Depends on**.
 - **Context:** Documented as `_G.MatchManager`, `_G.CurrencyService`, etc. across the codebase. PR #7 follows this pattern consistently. The `_G` antipattern is in many Roblox tutorials but Knit / Aero / Nevermore are all `require`-based.
 - **Depends on:** Nothing. Worth doing before adding a 5th service.
 
-## Architecture: phase event signaling
-
-- **What:** Replace `while task.wait(1) do ... mm.CurrentPhase end` polling in `NPCSystem.lua:432-444` and `LootSystem.lua:113-127` with a server-side `BindableEvent` fired by `MatchManager.setPhase`.
-- **Why:** Pre-existing pattern. Polling adds 1s of perceived spawn lag and burns two perma-coroutines.
-- **Pros:** Instant NPC/loot spawn on phase change; cleaner architecture; no busy loop.
-- **Cons:** ~20 LOC change across three files.
-- **Context:** Comment in NPCSystem.lua:431 acknowledges this: "Since PhaseChanged fires to clients, we use _G to detect phase from MatchManager." Solution is a BindableEvent (server-only).
-- **Depends on:** Nothing.
-
-## Performance: BindToClose parallelization
-
-- **What:** In each persistent service's `BindToClose`, save players concurrently via `task.spawn` + a wait barrier instead of sequentially.
-- **Why:** With 12 players × 3 stores × ~200ms each = ~7s sequential. Risk grows under DataStore throttling. BindToClose has 30s budget.
-- **Pros:** ~3x faster shutdown; more headroom under throttling.
-- **Cons:** ~10 LOC per service; introduces concurrency that must be tested.
-- **Context:** Pre-existing pattern in CurrencyService.lua:159, ShopService.lua:193, DailyQuestService.lua:174.
-- **Depends on:** Nothing. Cheap win.
-
-## Performance: LootSystem bobbing → Heartbeat
-
-- **What:** Replace per-pickup `task.spawn` 33Hz bob loop with a single `RunService.Heartbeat` driving all active loot in one pass.
-- **Why:** ~8 pickups × 33 events/sec = 264 coroutine switches/sec. Negligible but unnecessary.
-- **Pros:** Cleaner; trivially scales to 100+ pickups.
-- **Cons:** ~15 LOC refactor.
-- **Context:** LootSystem.lua:39-48. Pre-existing pattern.
-- **Depends on:** Nothing.
-
 ## Performance: mobile rendering pass
 
 - **What:** Audit PointLight count, hit-spark Parts, NPC highlights, NPC PointLights for mobile FPS impact. Probable changes: cull distant lights, replace some hit sparks with ParticleEmitter.
@@ -94,25 +68,6 @@ Each entry: **What / Why / Pros / Cons / Context / Depends on**.
 - **Cons:** Requires actual mobile device testing or Roblox device emulator.
 - **Context:** Pre-existing pattern; PR #7 didn't make it worse.
 - **Depends on:** Mobile QA target audience confirmed.
-
-## Game design: `FirstWinDaily` reward
-
-- **What:** Either implement first-win-of-the-day bonus payout in `MatchManager.endMatch` or remove `GameConfig.ECONOMY.Rewards.FirstWinDaily` from config.
-- **Why:** `GameConfig.lua:100` defines it (`FirstWinDaily = 300`) but no code references it. Dead config.
-- **Pros (implement):** Real day-one retention hook — extra +300 on the day's first match win on top of `PlacementWin`.
-- **Pros (remove):** Clean up dead config.
-- **Cons (implement):** Requires per-player day-tracker (similar to DailyQuestService) — could just reuse DailyQuestService's `Date` field.
-- **Context:** Found during PR #7 review. Probably an artifact of an earlier scope that wasn't fully wired.
-- **Depends on:** Nothing.
-
-## Anti-cheat: rate-limit FireWeapon
-
-- **What:** Server-side per-player FireWeapon timestamp; reject calls faster than `weapon.FireRate * 0.9`.
-- **Why:** Issue 2 added an origin distance check. A cheater could still spam FireWeapon faster than the weapon's natural rate to multiply DPS within the legal radius.
-- **Pros:** Enforces fire-rate budget server-side; prevents auto-clicker / packet-spam exploits.
-- **Cons:** ~10 LOC per-player table; must account for client ping (allow some grace).
-- **Context:** Currently FireRate is enforced only on the client (`canFire = false; task.delay(FireRate, ...)`).
-- **Depends on:** Nothing.
 
 ## Game design: quest progress overflow handling
 
@@ -138,3 +93,16 @@ Bugs flagged during PR #7 eng-review Studio playtest, fixed in the same PR
 - **Loot pickup Touched fired per character part** — fixed with per-pickup
   `consumed` flag in both `LootSystem.createPickup` and `NPCSystem.dropLoot`,
   so a single coin no longer awards 6× currency before Destroy propagates.
+
+Completed after the original 2026-05-10 review:
+
+- **Server phase signaling** — `MatchManager.PhaseChangedServer` now uses a
+  `BindableEvent`; NPC and loot spawning no longer poll once per second.
+- **Parallel shutdown saves** — Currency, shop, and daily quest services now
+  save players concurrently with a bounded `BindToClose` wait.
+- **Central loot bob driver** — one `RunService.Heartbeat` loop now updates all
+  active pickups.
+- **First-win daily reward** — `MatchManager` calls
+  `DailyQuestService.claimFirstWinDailyIfAvailable`.
+- **Server fire-rate limit** — `MatchManager` rejects calls faster than 90% of
+  the configured fire/attack interval.

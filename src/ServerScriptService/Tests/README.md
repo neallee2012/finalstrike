@@ -16,6 +16,7 @@ TestEZ-based unit tests for pure-logic helpers extracted from server services.
 | Module | Status | Notes |
 |--------|--------|-------|
 | `CurrencyMath.spec` | ✅ | 10 tests covering per-category cap, total cap, clamp, exhaustion. |
+| `ReloadLogic.spec` | ✅ | Reload eligibility, authoritative token/cancellation, stale operations, reserve-ammo accounting, partial reloads, and invalid config. |
 | `ShopService.spec` | ❌ TODO | `tryBuy` state machine. Blocked: ShopService.lua has DataStore + RemoteEvent side effects on require. Needs a similar `ShopLogic.lua` extraction. See TODOS.md. |
 | `DailyQuestService.spec` | ❌ TODO | `recordEvent` + `tryClaim` + `ensureFreshDay`. Same blocker as ShopService. |
 | `MatchManager.spec` | ❌ TODO | Placement math in `eliminatePlayer` (death order → top3/top5). Pure logic; needs extraction. |

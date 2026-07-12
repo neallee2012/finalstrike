@@ -1,7 +1,7 @@
 name: FPSViewmodel
 owner: claude-code
 priority: P1-polish
-status: ✅ DONE (Sprint 8 — commits 3db2349, 78c4b9f, ab5a601, Sprint 8a 補檔)
+status: "⚠️ PARTIAL (#39 two-hand hold remains open; #47 reload E2E passed 2026-07-12)"
 backfill_receipt: receipts/sprint-8-shop-economy-fps.md
 backfill_note: |
   此 contract 為 Sprint 8a 衛生補課產出。實際實作分散在 main 多個 commits：
@@ -17,8 +17,8 @@ purpose: |
   比賽中第一人稱（FPS）視角體驗：
   1. CameraController 鎖第一人稱 + 鎖定鼠標到中心（PvE/PvPWarning/PvP）；
      大廳 / 觀戰時釋放回三人稱 + 自由鼠標。
-  2. ViewmodelController 強制手臂可見（覆蓋 LockFirstPerson 預設隱藏）+
-     LeftHand IK 把左手 pin 到武器 Handle.LeftGrip attachment（雙手持槍）。
+  2. ViewmodelController 強制手臂可見（覆蓋 LockFirstPerson 預設隱藏）；
+     WeaponClient 播放已發布的 R15 reload animation，無匹配 clip 時使用程序化姿勢。
   3. crosshair-aligned aim：raycast 從 viewport center 出，bullet 對齊準心
      而非 muzzle 方向（修正 #5/6/7）。
 
@@ -62,18 +62,26 @@ viewmodel_arms:
   fix: "RenderStepped 強制 6 個 arm parts (Left/Right Upper/Lower/Hand) LocalTransparencyModifier=0"
 
 left_hand_ik:
-  trigger: "Tool 加入 character 時 (ChildAdded)"
-  setup_delay: "task.wait(0.1) 讓 server 的 grip weld 安頓再解析 attachment"
-  ik_config:
-    Type: Position
-    ChainRoot: LeftUpperArm
-    EndEffector: LeftHand
-    Target: tool.Handle.LeftGrip (Attachment)
-    Weight: 1.0
-    Priority: 1000  # 高 priority 防 jump animation override (#12)
-  teardown: "Tool removed 或新 Tool equipped → 重建 IKControl"
-  exempt_weapons: |
-    單手武器（Pistol/Knife）武器 mesh 不需要 LeftGrip attachment，IK 自動 skip。
+  state: disabled
+  reason: |
+    舊 server-side grip solver 會透過物理 constraint 拖動 HumanoidRootPart，
+    造成玩家與 NPC 漂移（#56）。ViewmodelController 目前只維持手臂可見。
+  open_issue: "#39 — non-propulsive two-hand hold pose"
+
+reload_animation:
+  authoritative_timing: "MatchManager 提供 ReloadTime；client clip 依該 duration 調速"
+  published_ids:
+    Pistol: 102338606855201
+    Rifle: 99673558497035
+    Shotgun: 70858423637669
+  exact_type_policy: "不把 Rifle clip 冒用到 SMG / Sniper / Minigun"
+  fallback: "R15Pose 依序混合 ReloadEject → ReloadInsert → ReloadRack；不建立 physics constraint"
+  cancellation: "death / respawn / equip change / training exit / server reject 會停止 track 並銷毀 pose controller"
+  reserve_ammo: "HUD 顯示 magazine / reserve；pickup 進 reserve，不中斷當前 reload"
+  full_place_e2e_2026_07_12:
+    place: "最後一擊"
+    input: "實際 mouse click 與 R key"
+    evidence: "Pistol clip 102338606855201 播放；HUD progress 可見；manual/auto/partial reload、reserve pickup、respawn/elimination cancellation 均與 server state 一致"
 
 crosshair_aligned_aim:
   problem: |
@@ -86,17 +94,17 @@ crosshair_aligned_aim:
 
 artifacts:
   - src/StarterPlayerScripts/CameraController.lua  (130 行 — 主控)
-  - src/StarterPlayerScripts/ViewmodelController.lua  (94 行 — arms 可見 + LeftHand IK)
-  - src/StarterPlayerScripts/WeaponClient.lua  (修正 fire origin 至 camera center)
+  - src/StarterPlayerScripts/ViewmodelController.lua  (arms 可見)
+  - src/StarterPlayerScripts/WeaponClient.lua  (crosshair aim + reload animation/fallback)
+  - src/ReplicatedStorage/R15Pose.lua  (non-physical upper-body pose controller)
   - src/StarterPlayerScripts/HUDController.lua  (crosshair ScreenGui FinalStrikeCrosshair)
   - src/ServerScriptService/MatchManager.lua  (FireWeapon handler 接收 client crosshair-aligned direction)
 
 success_criteria:
   - "比賽中鎖第一人稱，玩家看到自己的手 + 武器"
-  - "雙手武器（Rifle/SMG/Sniper/Shotgun）左手 IK 抓在 LeftGrip"
-  - "Pistol/Knife 不啟動 IK（沒 LeftGrip attachment）"
-  - "Tool 切換時 IK 立即重建，不殘留前一把武器的 IK"
-  - "Jump 時 IK Priority 1000 蓋住 jump animation 的 LeftArm 軌道（#12）"
+  - "Pistol / Rifle / Shotgun 使用對應、由 Final Strike owner 發布的 R15 reload clip"
+  - "SMG / Sniper / Minigun 使用程序化 reload fallback，不冒用錯誤武器 clip"
+  - "reload 取消或換槍時不殘留 AnimationTrack / R15Pose task"
   - "Shop / Daily Quest UI 開啟時，鼠標釋放可點 UI 按鈕"
   - "UI 關閉後恢復 LockCenter（在比賽中）"
   - "被淘汰玩家切回三人稱觀戰（#11）"
@@ -106,14 +114,15 @@ success_criteria:
 recovery:
   - "鼠標卡 LockCenter 點不到 UI → releaseEnforceUntil 機制 / interactive_uis_set 是否註冊"
   - "手不見 → ViewmodelController RenderStepped LocalTransparencyModifier 強制"
-  - "雙手沒 IK → tool.Handle.LeftGrip attachment 是否存在；task.wait(0.1) 延遲足夠"
-  - "Jump 時手脫離武器 → IK Priority 是否 1000"
+  - "reload clip 不播放 → 檢查 GameConfig ID ownership；client 會預載，60 frames 仍未 ready 才切 fallback"
+  - "reload pose 殘留 → 檢查 ReloadStateChanged(false) 與 reloadGeneration cancellation"
   - "Bullet 不對齊 crosshair → WeaponClient raycast origin 是否改成 camera center"
 
 # ============= 已知限制 / Sprint 8b+ 候選 =============
 known_limitations:
   - "muzzle flash 仍 client-only（Sprint 7 lesson）— 跨玩家可見要 server-side flash event"
   - "Crosshair 是 4-segment open-center（commit d054043 CEO spec），未對應稀有度顏色"
+  - "一般持槍時的非物理雙手 pose 尚未接回；#39 保持 open"
 
 # ============= 依賴 =============
 dependencies:

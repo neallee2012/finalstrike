@@ -16,6 +16,11 @@ GameConfig.SPAWN_PROTECTION = 3     -- seconds of NPC-damage immunity after tele
 GameConfig.MAX_HP = 200
 GameConfig.MEDKIT_HEAL = 100  -- legacy fallback; new code reads GameConfig.LOOT[tier].Heal directly
 
+-- Magazine economy. Players enter a match (or select a training weapon) with
+-- five spare magazines; ammo pickups add reserve rounds up to fifteen magazines.
+GameConfig.STARTING_RESERVE_MAGAZINES = 5
+GameConfig.MAX_RESERVE_MAGAZINES = 15
+
 -- Headshot multiplier — Sprint 8b only Sniper Type applies (D1 decision)
 -- See proposals/sprint-8-200hp-balance.md §3.5 for full rationale.
 GameConfig.HEADSHOT_MULTIPLIER = 2.0
@@ -94,6 +99,14 @@ GameConfig.WEAPONS = {
 	["Phantom Hellfire"]= {Type="Rifle",   Rarity="Demon",     Price=31500, Damage= 27, FireRate=0.13,  MagSize=30, ReloadTime=2.0, Range=380, Spread=0.012, Auto=true, Burn=true },  -- price was 42000 (-25%) (Burn unchanged)
 	["Wraith Abyss"]   = { Type="Sniper",  Rarity="Demon",     Price=36000, Damage=220, FireRate=1.05,  MagSize=5,  ReloadTime=2.8, Range=600, Spread=0.003, Auto=false, Pierce=true },  -- price was 48000 (-25%) (Pierce unchanged)
 	["Thunder Bloodmoon"]={Type="Shotgun", Rarity="Demon",     Price=41250, Damage= 14, Pellets=8, FireRate=0.60, MagSize=6, ReloadTime=2.3, Range=70, Spread=0.080, Auto=false },  -- price was 55000 (-25%)
+}
+
+-- Published R15 reload animations by matching weapon type. WeaponClient scales
+-- each clip to the weapon's ReloadTime; unlisted types use procedural R15 poses.
+GameConfig.RELOAD_ANIMATION_IDS = {
+	Pistol = 102338606855201,
+	Rifle = 99673558497035,
+	Shotgun = 70858423637669,
 }
 
 -- Default starter weapons — every player owns these from the start, no purchase needed
