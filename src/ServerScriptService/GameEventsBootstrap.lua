@@ -38,11 +38,11 @@ makeRemoteEvent("FireWeapon")          -- client → server: origin, direction, 
 makeRemoteEvent("WeaponHit")           -- server → client: hit effects
 makeRemoteEvent("EquipWeapon")         -- server → client: weaponName
 makeRemoteEvent("ReloadWeapon")        -- client → server
-makeRemoteEvent("ReloadComplete")      -- server → client
+makeRemoteEvent("ReloadStateChanged")  -- server → client: active, duration, weaponName
 
 -- Loot
 makeRemoteEvent("LootPickedUp")       -- server → client: lootType, amount
-makeRemoteEvent("AmmoUpdate")         -- server → client: current, max
+makeRemoteEvent("AmmoUpdate")         -- server → client: magazine, reserve, magSize
 
 -- NPC
 makeRemoteEvent("NPCDamaged")         -- visual feedback

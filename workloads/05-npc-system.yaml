@@ -1,7 +1,11 @@
 name: NPCSystem
 owner: claude-code
 priority: P0-prototype
-status: ✅ DONE (Sprint 3 + Sprint 7 R15 mesh + Sprint 8b HP×2 + 4-tier medkit drops, 2026-05-03)
+status: "✅ IMPLEMENTED (#36 full-place AI E2E passed in 最後一擊 on 2026-07-12; awaiting PR)"
+open_issues:
+  - "#36 remains open until the implementation PR lands."
+resolved_regressions:
+  - "#56 server-side LeftHand AlignPosition was disabled because it propelled character roots."
 sprint_8b_receipt: receipts/sprint-8b-200hp-rebalance.md
 
 # ============= Sprint 8 計劃中的修改 =============
@@ -66,14 +70,18 @@ stages:
   - implement: 被擊敗掉落戰利品
   - verify: NPC 巡邏 → 偵測玩家 → 追擊 → 攻擊 → 死亡掉寶
 success_criteria:
-  - Patrol 60HP, Armored 150HP, Elite 250HP (Sprint 8 將翻倍)
+  - Patrol 120HP, Armored 300HP, Elite 500HP
   - R15 character mesh + 自動 BodyColors + Animate LocalScript（內建）
   - 三種 NPC 衣裝差異化（Patrol 警衛帽+徽章 / Armored 戰術頭盔+背心 / Elite 兜帽+紅徽記+披風）
   - 偵測範圍內 Pathfinding 追擊，攻擊範圍內造成傷害
   - 死亡後根據 LootTable 掉落物品
+  - 攻擊時以 R15Pose 舉槍瞄準，射擊時 recoil，離開 Attack 時 reset
+  - "targeted Studio check: aim/fire transform 0° error、RootPart drift 0、WalkSpeed unchanged、no new instances"
+  - "最後一擊 E2E: 9 NPC spawn；近距 Patrol 進入 Attack/fire path；非零 joint pose 被觀察；physical constraint count = 0"
 artifacts:
   - src/ServerScriptService/NPCSystem.lua
   - src/ReplicatedStorage/GameConfig.lua (enemy data)
+  - src/ReplicatedStorage/R15Pose.lua (non-physics procedural upper-body pose)
 recovery:
   - NPC 不動 → 確認 HumanoidRootPart 存在 + Pathfinding agent params 對齊 R15 size
   - NPC 穿牆 → 用 PathfindingService 而非直接 MoveTo (Sprint 6 lesson)

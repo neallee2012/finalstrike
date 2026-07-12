@@ -8,6 +8,7 @@ local ServerStorage = game:GetService("ServerStorage")
 -- Wait for modules
 local GameConfig = require(ReplicatedStorage:WaitForChild("GameConfig"))
 local WeaponMeshes = require(ServerStorage:WaitForChild("WeaponMeshes"))
+local ReloadLogic = require(ServerStorage:WaitForChild("ReloadLogic"))
 local events = ReplicatedStorage:WaitForChild("GameEvents")
 
 local PhaseChanged = events:WaitForChild("PhaseChanged")
@@ -15,6 +16,8 @@ local TimerUpdate = events:WaitForChild("TimerUpdate")
 local Announcement = events:WaitForChild("Announcement")
 local PlayerEliminated = events:WaitForChild("PlayerEliminated")
 local KillFeed = events:WaitForChild("KillFeed")
+local AmmoUpdate = events:WaitForChild("AmmoUpdate")
+local ReloadStateChanged = events:WaitForChild("ReloadStateChanged")
 
 -- Per-shot [Fire] debug logging. Auto weapons fire ~12 shots/sec and shotguns
 -- log per pellet, so this is OFF by default to avoid flooding the console
@@ -38,7 +41,14 @@ phaseChangedServer.Name = "PhaseChangedServer"
 MatchManager.PhaseChangedServer = phaseChangedServer.Event
 
 -- Player data store (per-match)
-local playerData = {}  -- [player] = { HP, Ammo, Coins, Weapon, Eliminated }
+local playerData = {}  -- [player] = { HP, MaxHP, Ammo, ReserveAmmo, Weapon, Eliminated, ProtectedUntil, Reloading, ReloadToken, ReloadEndsAt }
+
+local function pushAmmoState(player, data)
+	if player.Parent ~= Players then return end
+	local config = GameConfig.WEAPONS[data.Weapon]
+	local magSize = (config and config.MagSize) or 0
+	AmmoUpdate:FireClient(player, data.Ammo or 0, data.ReserveAmmo or 0, magSize)
+end
 
 -- Reward helper: routes through CurrencyService (which enforces per-match caps)
 -- and logs successful awards. Returns 0 if CurrencyService not loaded yet or capped.
@@ -79,18 +89,27 @@ function MatchManager.initPlayerData(player)
 	-- Use player's chosen primary weapon (from shop equip) — fallback to STARTER_WEAPONS
 	-- if ShopService isn't loaded or hasn't loaded the player yet.
 	local equipped = (_G.ShopService and _G.ShopService.getPrimary(player)) or GameConfig.STARTER_WEAPONS[1]
-	local equippedCfg = GameConfig.WEAPONS[equipped] or GameConfig.WEAPONS[GameConfig.STARTER_WEAPONS[1]]
+	if not GameConfig.WEAPONS[equipped] then
+		equipped = GameConfig.STARTER_WEAPONS[1]
+	end
+	local equippedCfg = GameConfig.WEAPONS[equipped]
 
 	-- Start each player with a full magazine of their equipped weapon (Issue 4).
 	-- Knives have no MagSize, so we fall back to 0 (knives ignore Ammo anyway).
 	local startingAmmo = equippedCfg.MagSize or 0
+	local previousData = playerData[player]
+	if previousData then ReloadLogic.cancel(previousData) end
 	playerData[player] = {
 		HP = GameConfig.MAX_HP,
 		MaxHP = GameConfig.MAX_HP,
 		Ammo = startingAmmo,
+		ReserveAmmo = startingAmmo * GameConfig.STARTING_RESERVE_MAGAZINES,
 		Weapon = equipped,
 		Eliminated = false,
 		ProtectedUntil = 0,  -- set after teleportToArena
+		Reloading = false,
+		ReloadToken = 0,
+		ReloadEndsAt = 0,
 	}
 	-- Send initial HP + ammo + equipped weapon. WeaponClient relies on
 	-- EquipWeapon to update its `currentWeapon`; without it the client
@@ -98,9 +117,95 @@ function MatchManager.initPlayerData(player)
 	-- Range/FireRate/Auto stats client-side.
 	local healthUpdate = events:WaitForChild("HealthUpdate")
 	healthUpdate:FireClient(player, GameConfig.MAX_HP, GameConfig.MAX_HP)
-	local ammoUpdate = events:WaitForChild("AmmoUpdate")
-	ammoUpdate:FireClient(player, startingAmmo, startingAmmo)
+	pushAmmoState(player, playerData[player])
+	ReloadStateChanged:FireClient(player, false, 0, equipped)
 	events:WaitForChild("EquipWeapon"):FireClient(player, equipped)
+end
+
+function MatchManager.syncAmmoState(player)
+	local data = playerData[player]
+	if data then pushAmmoState(player, data) end
+end
+
+local function pushReloadState(player, active, duration, weaponName)
+	if player.Parent == Players then
+		ReloadStateChanged:FireClient(player, active, duration or 0, weaponName)
+	end
+end
+
+function MatchManager.cancelReload(player)
+	local data = playerData[player]
+	if not data then return false end
+
+	local wasReloading = ReloadLogic.cancel(data)
+	if wasReloading then
+		pushReloadState(player, false, 0, data.Weapon)
+	end
+	return wasReloading
+end
+
+function MatchManager.syncReloadState(player)
+	local data = playerData[player]
+	if not data then
+		pushReloadState(player, false, 0, nil)
+		return
+	end
+
+	if data.Reloading then
+		local remaining = math.max(0, (data.ReloadEndsAt or 0) - tick())
+		pushReloadState(player, true, remaining, data.Weapon)
+	else
+		pushReloadState(player, false, 0, data.Weapon)
+	end
+end
+
+local function hasEquippedWeapon(player, weaponName)
+	local character = player.Character
+	local equippedTool = character and character:FindFirstChild(weaponName)
+	return equippedTool ~= nil and equippedTool:IsA("Tool")
+end
+
+function MatchManager.startReload(player)
+	local data = playerData[player]
+	if not data then return false end
+	if not hasEquippedWeapon(player, data.Weapon) then return false end
+
+	local config = GameConfig.WEAPONS[data.Weapon]
+	local operation = ReloadLogic.start(data, config, tick())
+	if not operation then return false end
+
+	pushReloadState(player, true, operation.Duration, operation.Weapon)
+	task.delay(operation.Duration, function()
+		if playerData[player] ~= data then return end
+		if not hasEquippedWeapon(player, operation.Weapon) then
+			MatchManager.cancelReload(player)
+			return
+		end
+		if not ReloadLogic.complete(data, operation, config) then return end
+
+		pushAmmoState(player, data)
+		pushReloadState(player, false, 0, operation.Weapon)
+	end)
+	return true
+end
+
+function MatchManager.addAmmo(player, amount)
+	local data = playerData[player]
+	if not data or data.Eliminated then return 0 end
+	if type(amount) ~= "number" or amount <= 0 then return 0 end
+
+	local config = GameConfig.WEAPONS[data.Weapon]
+	local magSize = config and config.MagSize
+	if type(magSize) ~= "number" or magSize <= 0 then return 0 end
+
+	local added = ReloadLogic.addReserve(
+		data,
+		config,
+		amount,
+		GameConfig.MAX_RESERVE_MAGAZINES
+	)
+	pushAmmoState(player, data)
+	return added
 end
 
 -- Build a weapon Tool and parent it to the player's Character so Roblox's
@@ -157,6 +262,9 @@ local ARENA_PHASES = {
 
 local function bindRespawnHook(player)
 	player.CharacterAdded:Connect(function()
+		-- A new character invalidates any reload animation/tool state tied to
+		-- the previous rig. Cancel before the client clears its local state.
+		MatchManager.cancelReload(player)
 		task.wait(0.5)  -- let R15 rig finish loading
 		if not ARENA_PHASES[MatchManager.CurrentPhase] then return end
 		local data = playerData[player]
@@ -217,6 +325,7 @@ function MatchManager.eliminatePlayer(player, killer)
 	local data = playerData[player]
 	if not data or data.Eliminated then return end
 
+	MatchManager.cancelReload(player)
 	data.Eliminated = true
 	MatchManager.AlivePlayers[player] = nil
 
@@ -356,6 +465,9 @@ function MatchManager.resetToLobby()
 	MatchManager.setPhase(GameConfig.PHASE.LOBBY)
 	MatchManager.AlivePlayers = {}
 	MatchManager.PvPEnabled = false
+	for player in pairs(playerData) do
+		MatchManager.cancelReload(player)
+	end
 	playerData = {}
 
 	-- Defensive Tool destroy (#35 / #38): even though LoadCharacter destroys
@@ -536,9 +648,11 @@ local lastFireTick = {}  -- [player] = tick() at last accepted shot
 Players.PlayerRemoving:Connect(function(player)
 	if MatchManager.AlivePlayers[player] then
 		MatchManager.AlivePlayers[player] = nil
-		playerData[player] = nil
 		MatchManager.checkWinCondition()
 	end
+	local data = playerData[player]
+	if data then ReloadLogic.cancel(data) end
+	playerData[player] = nil
 	lastFireTick[player] = nil  -- don't leak Player keys
 end)
 
@@ -588,6 +702,7 @@ events:WaitForChild("FireWeapon").OnServerEvent:Connect(function(player, origin,
 
 	local config = GameConfig.WEAPONS[weaponName]
 	if not config then return end
+	if data.Reloading then return end
 
 	-- Anti-cheat: server-side fire-rate limit. Reject calls faster than the
 	-- weapon's declared rate (with 10% slack for jitter). Without this, an
@@ -615,11 +730,14 @@ events:WaitForChild("FireWeapon").OnServerEvent:Connect(function(player, origin,
 		return
 	end
 
+	local shouldAutoReload = false
+
 	-- Ammo check
 	if config.Type ~= "Knife" then
 		if data.Ammo <= 0 then return end
 		data.Ammo = data.Ammo - 1
-		events.AmmoUpdate:FireClient(player, data.Ammo, config.MagSize)
+		pushAmmoState(player, data)
+		shouldAutoReload = data.Ammo == 0
 	end
 
 	-- Raycast
@@ -684,20 +802,17 @@ events:WaitForChild("FireWeapon").OnServerEvent:Connect(function(player, origin,
 			broadcastHitNearby(result.Position, result.Normal)
 		end
 	end
+
+	if shouldAutoReload then
+		MatchManager.startReload(player)
+	end
 end)
 
 -- Reload handler
 events:WaitForChild("ReloadWeapon").OnServerEvent:Connect(function(player)
-	local data = playerData[player]
-	if not data or data.Eliminated then return end
-
-	local config = GameConfig.WEAPONS[data.Weapon]
-	if not config or config.Type == "Knife" then return end
-
-	task.wait(config.ReloadTime)
-	data.Ammo = config.MagSize
-	events.AmmoUpdate:FireClient(player, data.Ammo, config.MagSize)
-	events.ReloadComplete:FireClient(player)
+	if not MatchManager.startReload(player) then
+		MatchManager.syncReloadState(player)
+	end
 end)
 
 -- Make MatchManager accessible to other scripts

@@ -67,11 +67,7 @@ local function createPickup(lootType, position)
 		consumed = true
 
 		if lootType == "Ammo" then
-			data.Ammo = data.Ammo + GameConfig.LOOT.Ammo.Amount
-			-- AmmoUpdate max should reflect equipped weapon's MagSize, not a hardcoded 30 (Issue 4).
-			local weaponCfg = GameConfig.WEAPONS[data.Weapon]
-			local maxAmmo = (weaponCfg and weaponCfg.MagSize) or data.Ammo
-			events.AmmoUpdate:FireClient(player, data.Ammo, maxAmmo)
+			mm.addAmmo(player, GameConfig.LOOT.Ammo.Amount)
 		elseif lootType == "MedkitSmall" or lootType == "Medkit"
 		    or lootType == "MedkitLarge" or lootType == "MedkitFull" then
 			-- Sprint 8b: 4-tier medkit; heal amount lookup from GameConfig.LOOT[tier].Heal

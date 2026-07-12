@@ -6,6 +6,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local events = ReplicatedStorage:WaitForChild("GameEvents")
@@ -65,7 +66,7 @@ ammoLabel.Position = UDim2.new(1, -170, 1, -60)
 ammoLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 ammoLabel.BackgroundTransparency = 0.3
 ammoLabel.BorderSizePixel = 0
-ammoLabel.Text = "AMMO: 30"
+ammoLabel.Text = "AMMO: -- / --"
 ammoLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
 ammoLabel.TextScaled = true
 ammoLabel.Font = Enum.Font.GothamBold
@@ -74,6 +75,48 @@ ammoLabel.Parent = screenGui
 local ammoCorner = Instance.new("UICorner")
 ammoCorner.CornerRadius = UDim.new(0, 6)
 ammoCorner.Parent = ammoLabel
+
+local reloadFrame = Instance.new("Frame")
+reloadFrame.Name = "ReloadFrame"
+reloadFrame.Size = UDim2.new(0, 150, 0, 28)
+reloadFrame.Position = UDim2.new(1, -170, 1, -96)
+reloadFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+reloadFrame.BackgroundTransparency = 0.15
+reloadFrame.BorderSizePixel = 0
+reloadFrame.Visible = false
+reloadFrame.Parent = screenGui
+
+local reloadCorner = Instance.new("UICorner")
+reloadCorner.CornerRadius = UDim.new(0, 6)
+reloadCorner.Parent = reloadFrame
+
+local reloadLabel = Instance.new("TextLabel")
+reloadLabel.Name = "ReloadLabel"
+reloadLabel.Size = UDim2.new(1, -8, 0, 18)
+reloadLabel.Position = UDim2.new(0, 4, 0, 1)
+reloadLabel.BackgroundTransparency = 1
+reloadLabel.Text = "RELOADING..."
+reloadLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
+reloadLabel.TextScaled = true
+reloadLabel.Font = Enum.Font.GothamBold
+reloadLabel.Parent = reloadFrame
+
+local reloadBarBack = Instance.new("Frame")
+reloadBarBack.Name = "ReloadBarBack"
+reloadBarBack.Size = UDim2.new(1, -8, 0, 5)
+reloadBarBack.Position = UDim2.new(0, 4, 1, -7)
+reloadBarBack.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
+reloadBarBack.BorderSizePixel = 0
+reloadBarBack.Parent = reloadFrame
+
+local reloadBar = Instance.new("Frame")
+reloadBar.Name = "ReloadBar"
+reloadBar.Size = UDim2.new(0, 0, 1, 0)
+reloadBar.BackgroundColor3 = Color3.fromRGB(255, 70, 55)
+reloadBar.BorderSizePixel = 0
+reloadBar.Parent = reloadBarBack
+
+local reloadTween = nil
 
 -- === PHASE & TIMER ===
 local phaseLabel = Instance.new("TextLabel")
@@ -318,8 +361,29 @@ events:WaitForChild("HealthUpdate").OnClientEvent:Connect(function(hp, maxHP)
 	end
 end)
 
-events:WaitForChild("AmmoUpdate").OnClientEvent:Connect(function(current, max)
-	ammoLabel.Text = "AMMO: " .. current
+events:WaitForChild("AmmoUpdate").OnClientEvent:Connect(function(magazine, reserve)
+	ammoLabel.Text = string.format("AMMO: %d / %d", magazine, reserve)
+end)
+
+events:WaitForChild("ReloadStateChanged").OnClientEvent:Connect(function(active, duration)
+	if reloadTween then
+		reloadTween:Cancel()
+		reloadTween = nil
+	end
+
+	if active and duration > 0 then
+		reloadFrame.Visible = true
+		reloadBar.Size = UDim2.new(0, 0, 1, 0)
+		reloadTween = TweenService:Create(
+			reloadBar,
+			TweenInfo.new(duration, Enum.EasingStyle.Linear),
+			{ Size = UDim2.new(1, 0, 1, 0) }
+		)
+		reloadTween:Play()
+	else
+		reloadFrame.Visible = false
+		reloadBar.Size = UDim2.new(0, 0, 1, 0)
+	end
 end)
 
 events:WaitForChild("PhaseChanged").OnClientEvent:Connect(function(phase)

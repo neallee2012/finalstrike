@@ -8,6 +8,7 @@ local PathfindingService = game:GetService("PathfindingService")
 local ServerStorage = game:GetService("ServerStorage")
 
 local GameConfig = require(ReplicatedStorage:WaitForChild("GameConfig"))
+local R15Pose = require(ReplicatedStorage:WaitForChild("R15Pose"))
 local WeaponMeshes = require(ServerStorage:WaitForChild("WeaponMeshes"))
 local events = ReplicatedStorage:WaitForChild("GameEvents")
 
@@ -23,6 +24,7 @@ local NPC_WEAPON = {
 
 local NPCSystem = {}
 local activeNPCs = {}
+local warnedUnsupportedPose = false
 
 -- PathfindingService agent params tuned for the standard R15 character
 -- (~2 stud wide, ~5 stud tall, default HipHeight ~2.2).
@@ -272,11 +274,7 @@ local function dropLoot(npcModel)
 				consumed = true
 
 				if lootType == "Ammo" then
-					data.Ammo = data.Ammo + GameConfig.LOOT.Ammo.Amount
-					-- AmmoUpdate max from equipped MagSize, not hardcoded 30 (Issue 4).
-					local weaponCfg = GameConfig.WEAPONS[data.Weapon]
-					local maxAmmo = (weaponCfg and weaponCfg.MagSize) or data.Ammo
-					events.AmmoUpdate:FireClient(player, data.Ammo, maxAmmo)
+					mm.addAmmo(player, GameConfig.LOOT.Ammo.Amount)
 				elseif lootType == "MedkitSmall" or lootType == "Medkit"
 				    or lootType == "MedkitLarge" or lootType == "MedkitFull" then
 					-- Sprint 8b: 4-tier medkit; heal amount lookup
@@ -311,6 +309,24 @@ local function runNPCAI(npcModel)
 	local config = GameConfig.ENEMIES[npcModel:GetAttribute("EnemyType")]
 	local lastAttack = 0
 	local patrolTarget = nil
+	local poseController = R15Pose.new(npcModel)
+	local poseState = nil
+
+	if not poseController:IsSupported() and not warnedUnsupportedPose then
+		warnedUnsupportedPose = true
+		warn("[NPCSystem] Procedural aim pose unavailable: this R15 rig has no supported arm animation joints")
+	end
+
+	local function setAIState(state)
+		npcModel:SetAttribute("State", state)
+		if state == poseState then return end
+		poseState = state
+		if state == "Attack" then
+			poseController:SetPose(R15Pose.Poses.NPCAim, 0.2)
+		else
+			poseController:Reset(0.2)
+		end
+	end
 
 	-- Pathfinding state for Chase mode
 	local path = PathfindingService:CreatePath(PATH_AGENT)
@@ -362,7 +378,7 @@ local function runNPCAI(npcModel)
 			if npcModel:GetAttribute("IsTrainingDummy") then
 				return
 			end
-			npcModel:SetAttribute("State", "Dead")
+			setAIState("Dead")
 			dropLoot(npcModel)
 
 			-- Death effect
@@ -385,7 +401,10 @@ local function runNPCAI(npcModel)
 	end)
 
 	-- AI loop
-	while npcModel.Parent and humanoid.Health > 0 do
+	while npcModel.Parent
+		and humanoid.Health > 0
+		and npcModel:GetAttribute("State") ~= "Dead"
+	do
 		local root = npcModel.PrimaryPart
 		if not root then break end
 
@@ -430,7 +449,7 @@ local function runNPCAI(npcModel)
 		if canEngage then
 			if closestDist <= attackRange then
 				-- Attack
-				npcModel:SetAttribute("State", "Attack")
+				setAIState("Attack")
 				humanoid:MoveTo(root.Position)  -- stop walking
 
 				-- Face the player before firing (#22) — only Y-axis rotation so
@@ -450,6 +469,12 @@ local function runNPCAI(npcModel)
 
 				if tick() - lastAttack >= npcModel:GetAttribute("AttackRate") then
 					lastAttack = tick()
+					poseController:SetPose(R15Pose.Poses.NPCFire, 0.04)
+					task.delay(0.1, function()
+						if npcModel.Parent and npcModel:GetAttribute("State") == "Attack" then
+							poseController:SetPose(R15Pose.Poses.NPCAim, 0.08)
+						end
+					end)
 					local mm = _G.MatchManager
 					if mm then
 						mm.damagePlayer(closestPlayer, npcModel:GetAttribute("Damage"))
@@ -469,13 +494,13 @@ local function runNPCAI(npcModel)
 				end
 			else
 				-- Chase via PathfindingService so NPCs route around cover
-				npcModel:SetAttribute("State", "Chase")
+				setAIState("Chase")
 				local targetPos = closestPlayer.Character.HumanoidRootPart.Position
 				chaseWithPath(root, targetPos)
 			end
 		else
 			-- Patrol
-			npcModel:SetAttribute("State", "Patrol")
+			setAIState("Patrol")
 			if not patrolTarget or (root.Position - patrolTarget).Magnitude < 5 then
 				-- (#53) Training NPCs wander tight around their HomePosition so
 				-- they stay near their spawn marker. Live NPCs use the original
@@ -491,6 +516,7 @@ local function runNPCAI(npcModel)
 
 		task.wait(0.3)
 	end
+	poseController:Destroy()
 end
 
 -- Spawn all NPCs from markers
