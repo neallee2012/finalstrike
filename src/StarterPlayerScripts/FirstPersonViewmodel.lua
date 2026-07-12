@@ -53,6 +53,11 @@ local ARM_PARTS = {
 	RightLowerArm = true,
 	RightHand = true,
 }
+local INTERACTIVE_UIS = {
+	ShopUI = true,
+	DailyQuestUI = true,
+	TrainingArenaUI = true,
+}
 local RECOIL_STRENGTH = {
 	Pistol = 1.0,
 	SMG = 0.55,
@@ -112,27 +117,48 @@ local function cloneLimb(source, name, scale)
 	return limb
 end
 
-local function setRealPartsHidden(character, tool, hidden)
-	if character then
-		for partName in pairs(ARM_PARTS) do
-			local part = character:FindFirstChild(partName)
-			if part and part:IsA("BasePart") then
-				part.LocalTransparencyModifier = hidden and 1 or 0
-			end
+local function collectRealParts(character, tool)
+	local armParts = {}
+	for partName in pairs(ARM_PARTS) do
+		local part = character:FindFirstChild(partName)
+		if part and part:IsA("BasePart") then
+			table.insert(armParts, part)
 		end
 	end
-	if tool then
-		for _, descendant in ipairs(tool:GetDescendants()) do
-			if descendant:IsA("BasePart") then
-				descendant.LocalTransparencyModifier = hidden and 1 or 0
-			end
+
+	local toolParts = {}
+	for _, descendant in ipairs(tool:GetDescendants()) do
+		if descendant:IsA("BasePart") then
+			table.insert(toolParts, descendant)
+		end
+	end
+	return armParts, toolParts
+end
+
+local function setPartsHidden(parts, hidden)
+	for _, part in ipairs(parts) do
+		if part.Parent then
+			part.LocalTransparencyModifier = hidden and 1 or 0
 		end
 	end
 end
 
+local function isInteractiveUIOpen()
+	local playerGui = player:FindFirstChildOfClass("PlayerGui")
+	if not playerGui then return false end
+	for name in pairs(INTERACTIVE_UIS) do
+		local gui = playerGui:FindFirstChild(name)
+		if gui and gui:IsA("ScreenGui") and gui.Enabled then
+			return true
+		end
+	end
+	return false
+end
+
 local function destroyViewmodel()
 	if not viewmodel then return end
-	setRealPartsHidden(viewmodel.Character, viewmodel.SourceTool, false)
+	setPartsHidden(viewmodel.RealArmParts, false)
+	setPartsHidden(viewmodel.RealToolParts, false)
 	ViewmodelState.SetActiveMuzzle(nil)
 	if viewmodel.Model then viewmodel.Model:Destroy() end
 	viewmodel = nil
@@ -209,7 +235,9 @@ local function buildViewmodel(character, sourceTool)
 		return
 	end
 	for _, descendant in ipairs(model:GetDescendants()) do
-		if descendant:IsA("BasePart") and descendant ~= root then
+		if descendant:IsA("BaseScript") then
+			descendant:Destroy()
+		elseif descendant:IsA("BasePart") and descendant ~= root then
 			preparePart(descendant)
 			if sourceTool.Name == "Viper Aurum"
 				and descendant.Name ~= "Barrel"
@@ -262,6 +290,7 @@ local function buildViewmodel(character, sourceTool)
 	local rayParams = RaycastParams.new()
 	rayParams.FilterType = Enum.RaycastFilterType.Exclude
 	rayParams.FilterDescendantsInstances = { character, model }
+	local realArmParts, realToolParts = collectRealParts(character, sourceTool)
 
 	ViewmodelState.SetActiveMuzzle(handle:FindFirstChild("Muzzle"))
 	viewmodel = {
@@ -279,19 +308,24 @@ local function buildViewmodel(character, sourceTool)
 		Recoil = 0,
 		RecoilVelocity = 0,
 		RayParams = rayParams,
+		RealArmParts = realArmParts,
+		RealToolParts = realToolParts,
 	}
-	setRealPartsHidden(character, sourceTool, true)
+	setPartsHidden(realArmParts, true)
+	setPartsHidden(realToolParts, true)
 end
 
 local function isFirstPerson(character)
 	local camera = workspace.CurrentCamera
 	local head = character and character:FindFirstChild("Head")
-	if not camera or not head then return false end
+	if not camera or not head or isInteractiveUIOpen() then return false end
 	local distanceThreshold = viewmodel
 		and FIRST_PERSON_EXIT_DISTANCE
 		or FIRST_PERSON_ENTER_DISTANCE
+	-- Interactive menus release both locks before this frame is rendered.
 	return player.CameraMode == Enum.CameraMode.LockFirstPerson
-		or (camera.CFrame.Position - head.Position).Magnitude < distanceThreshold
+		or (UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter
+			and (camera.CFrame.Position - head.Position).Magnitude < distanceThreshold)
 end
 
 local function getReloadMotion()
@@ -345,7 +379,8 @@ local function updateViewmodel(dt)
 
 	local camera = workspace.CurrentCamera
 	viewmodel.Model:PivotTo(camera.CFrame)
-	setRealPartsHidden(character, sourceTool, true)
+	setPartsHidden(viewmodel.RealArmParts, true)
+	setPartsHidden(viewmodel.RealToolParts, true)
 
 	local moving = humanoid.MoveDirection.Magnitude > 0.1
 		and humanoid.FloorMaterial ~= Enum.Material.Air

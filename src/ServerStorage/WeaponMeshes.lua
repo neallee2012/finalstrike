@@ -394,15 +394,10 @@ function WeaponMeshes.attachLeftHandIK(character, tool)
 	-- pin the hand 2.2 studs from the LeftGrip regardless of MaxForce (1k–50k
 	-- all measured the same gap). The rigid pin is the only path that closes
 	-- that distance, and it's also the only path that causes the drag.
-	-- Trade-off: ALL characters lose the two-hand grip visual — NPCs, other
-	-- players in third-person, AND the local player's first-person view of
-	-- their own arms. ViewmodelController only forces real character arms
-	-- visible in first-person (no separate cosmetic viewmodel rig), so when
-	-- the server IK is disabled the local view loses the off-hand pose too.
-	-- Accepted because the RootPart drift / NPC propulsion this caused was
-	-- gameplay-breaking. Re-enable when we have a non-propulsive grip
-	-- mechanism (custom animation, or an anchor-style pin that doesn't
-	-- close the kinematic chain).
+	-- Non-physical client systems now supply both visuals: ViewmodelController
+	-- writes third-person R15 joint transforms, while FirstPersonViewmodel owns
+	-- the camera-local hands and weapon. Keep the old physical implementation
+	-- below disabled so RootPart drift / NPC propulsion cannot return.
 	if true then return nil end
 	-- luacheck: ignore (rest kept for reference / future re-enable)
 

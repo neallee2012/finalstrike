@@ -3,7 +3,7 @@
 --
 -- Every client applies the pose to every visible player so Transform state does
 -- not need server replication. FirstPersonViewmodel owns the local camera rig.
--- The old physical server solver stays disabled because it moved RootParts.
+-- The physical server solver stays disabled because it moved RootParts.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -204,7 +204,11 @@ local function watchPlayer(owner)
 			return
 		end
 
-		scheduleRefresh(owner, characterState, HOLD_RESUME_DELAY)
+		scheduleRefresh(
+			owner,
+			characterState,
+			owner == player and 0 or HOLD_RESUME_DELAY
+		)
 	end))
 
 	if owner.Character then

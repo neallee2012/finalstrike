@@ -48,6 +48,7 @@ camera_states:
 interactive_uis_set:
   - ShopUI
   - DailyQuestUI
+  - TrainingArenaUI
 
 mouse_release_enforcement:
   rationale: |
@@ -67,7 +68,8 @@ viewmodel_arms:
     CurrentCamera.CFrame。它 clone 裝備中的 Tool mesh 與左右 R15 Hand，以
     WeaponMotor / RightHandMotor / LeftHandMotor 連接；weapon 原有 WeldConstraint
     也轉成 local Motor6D。真實角色手臂與 Tool 僅用 LocalTransparencyModifier
-    在本機隱藏，其他玩家仍看到 server Tool 與完整第三人稱角色。
+    在本機隱藏，其他玩家仍看到 server Tool 與完整第三人稱角色。真實 parts
+    在建構時快取，clone 中的 BaseScript 會移除，RenderStepped 不重掃 descendants。
   motion:
     - "低幅 idle sway + mouse sway"
     - "落地移動時 walk bob；LeftShift+moving 時 visual-only sprint pose"
@@ -90,6 +92,16 @@ third_person_two_hand_grip:
     MatchManager 的 server-owned FinalStrikeReloading attribute 會在 reload 期間暫停
     normal hold，讓 published clip / procedural fallback 單獨控制 arm joints。
   single_handed: "Pistol / Knife 沒有 LeftGrip，因此不套 TwoHandHold"
+  two_client_e2e_2026_07_12:
+    topology: "StudioTestService Server & Clients，2 Players；Player1 shooter、Player2 remote observer"
+    idle: "observer LeftHand→LeftGrip 0.00663 studs；0 physical off-hand constraints"
+    run: "observer 在 16.01 studs/s、MoveDirection=1 時 gap 0.00663 studs"
+    jump_freefall: "observer 看到 7.20-stud jump arc、17.47 studs/s upward velocity、Freefall→Landed；max gap 0.00664 studs"
+    stationary_safety: "1.5s observer horizontal drift 0.00086 studs；無 RootPart propulsion"
+    reload: "FinalStrikeReloading=true 時 gap 2.942 studs（hold released）；false 後恢復 0.00663 studs"
+    local_reload_resume: "server attribute→RemoteEvent finish order下，第3 frame gap 0.0443、第8 frame 0.00663；無額外 0.1s rest-pose dead time"
+    single_handed: "observer 對 Viper Mk1 / Fang Scout 均看到 no LeftGrip、0 off-hand constraints"
+    golden_viper: "shooter camera-local ViewModel 有左右手、3 個 Motor6D、2 個 gold parts；0 BaseScripts / 0 physical constraints"
 
 reload_animation:
   authoritative_timing: "MatchManager 提供 ReloadTime；client clip 依該 duration 調速"
