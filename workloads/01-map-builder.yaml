@@ -26,7 +26,6 @@ success_criteria:
 artifacts:
   - src/ServerScriptService/MapBuilder.lua
   - src/ServerScriptService/LobbyBuilder.lua
-  - receipts/issue-55-industrial-bunker-lobby.md
 verification:
   studio_place: "最後一擊 (PlaceId 76520783469506, GameId 10086488941)"
   result: "20/20 rubric; 225 BaseParts, 362 descendants, 20 Lights, 12 SurfaceGuis; 59.37 focused client FPS over 300 frames."
