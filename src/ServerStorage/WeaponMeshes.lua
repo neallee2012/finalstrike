@@ -196,10 +196,10 @@ local TYPE_TO_BUILDER = {
 }
 
 -- Local position of the LeftGrip attachment (relative to Handle) per weapon Type.
--- WeaponMeshes.attachLeftHandIK is still called server-side from MatchManager
--- and NPCSystem, but the off-hand solver is disabled for now (#56). The active
--- path only normalizes RightGrip orientation so guns do not point into the floor.
--- Nil entries (Pistol, Knife) mean "single-handed, no IK".
+-- ViewmodelController consumes these attachments on every client to select the
+-- non-physical TwoHandHold pose. The old server solver stays disabled (#56);
+-- attachLeftHandIK only normalizes RightGrip orientation. Nil entries (Pistol,
+-- Knife) mean "single-handed".
 --
 -- Avatar-Joint-Upgrade rigs have a hard reach limit on the left arm:
 -- shoulder→LeftHand-center fully extended ≈ 1.86 studs. With the old
@@ -238,8 +238,7 @@ function WeaponMeshes.build(weaponName)
 	end
 	local model, handle = fn()
 
-	-- Add LeftGrip attachment for two-handed weapons so the server grip solver can
-	-- snap the character's LeftHand to it (visual: both hands gripping the gun).
+	-- Mark two-handed weapons for the client-side, non-physical hold pose.
 	local leftGripOffset = LEFT_GRIP_OFFSET[cfg.Type]
 	if leftGripOffset then
 		local leftGrip = Instance.new("Attachment")
@@ -395,15 +394,10 @@ function WeaponMeshes.attachLeftHandIK(character, tool)
 	-- pin the hand 2.2 studs from the LeftGrip regardless of MaxForce (1k–50k
 	-- all measured the same gap). The rigid pin is the only path that closes
 	-- that distance, and it's also the only path that causes the drag.
-	-- Trade-off: ALL characters lose the two-hand grip visual — NPCs, other
-	-- players in third-person, AND the local player's first-person view of
-	-- their own arms. ViewmodelController only forces real character arms
-	-- visible in first-person (no separate cosmetic viewmodel rig), so when
-	-- the server IK is disabled the local view loses the off-hand pose too.
-	-- Accepted because the RootPart drift / NPC propulsion this caused was
-	-- gameplay-breaking. Re-enable when we have a non-propulsive grip
-	-- mechanism (custom animation, or an anchor-style pin that doesn't
-	-- close the kinematic chain).
+	-- Non-physical client systems now supply both visuals: ViewmodelController
+	-- writes third-person R15 joint transforms, while FirstPersonViewmodel owns
+	-- the camera-local hands and weapon. Keep the old physical implementation
+	-- below disabled so RootPart drift / NPC propulsion cannot return.
 	if true then return nil end
 	-- luacheck: ignore (rest kept for reference / future re-enable)
 

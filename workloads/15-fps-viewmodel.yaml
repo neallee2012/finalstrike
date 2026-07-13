@@ -1,7 +1,7 @@
 name: FPSViewmodel
 owner: claude-code
 priority: P1-polish
-status: "⚠️ PARTIAL (#39 two-hand hold remains open; #47 reload E2E passed 2026-07-12)"
+status: "✅ COMPLETE (#39 non-physical two-hand hold; #47 reload E2E passed 2026-07-12)"
 backfill_receipt: receipts/sprint-8-shop-economy-fps.md
 backfill_note: |
   此 contract 為 Sprint 8a 衛生補課產出。實際實作分散在 main 多個 commits：
@@ -17,9 +17,13 @@ purpose: |
   比賽中第一人稱（FPS）視角體驗：
   1. CameraController 鎖第一人稱 + 鎖定鼠標到中心（PvE/PvPWarning/PvP）；
      大廳 / 觀戰時釋放回三人稱 + 自由鼠標。
-  2. ViewmodelController 強制手臂可見（覆蓋 LockFirstPerson 預設隱藏）；
-     WeaponClient 播放已發布的 R15 reload animation，無匹配 clip 時使用程序化姿勢。
-  3. crosshair-aligned aim：raycast 從 viewport center 出，bullet 對齊準心
+  2. FirstPersonViewmodel 在 CurrentCamera 下建立 local-only 雙手 + 武器
+     Motor6D rig；ViewmodelController 則在所有 client 為真實第三人稱角色維持
+     non-physical R15 TwoHandHold。兩層分工，避免多個 controller 同時寫相同 joints。
+  3. WeaponClient 播放已發布的真實角色 R15 reload animation，無匹配 clip
+     時使用程序化姿勢；camera ViewModel 依相同 authoritative reload timing
+     播放自己的 Motor6D reload motion。
+  4. crosshair-aligned aim：raycast 從 viewport center 出，bullet 對齊準心
      而非 muzzle 方向（修正 #5/6/7）。
 
 # ============= 規格 =============
@@ -44,6 +48,7 @@ camera_states:
 interactive_uis_set:
   - ShopUI
   - DailyQuestUI
+  - TrainingArenaUI
 
 mouse_release_enforcement:
   rationale: |
@@ -58,15 +63,45 @@ mouse_release_enforcement:
     - else: 不 enforce，讓 CameraScript 自管（right-click drag、click-to-move）
 
 viewmodel_arms:
-  rationale: "LockFirstPerson 設 LocalTransparencyModifier=1 隱藏所有 body parts，玩家看不到自己的手"
-  fix: "RenderStepped 強制 6 個 arm parts (Left/Right Upper/Lower/Hand) LocalTransparencyModifier=0"
+  architecture: |
+    FirstPersonViewmodel 每個 RenderStepped 將 anchored transparent root PivotTo
+    CurrentCamera.CFrame。它 clone 裝備中的 Tool mesh 與左右 R15 Hand，以
+    WeaponMotor / RightHandMotor / LeftHandMotor 連接；weapon 原有 WeldConstraint
+    也轉成 local Motor6D。真實角色手臂與 Tool 僅用 LocalTransparencyModifier
+    在本機隱藏，其他玩家仍看到 server Tool 與完整第三人稱角色。真實 parts
+    在建構時快取，clone 中的 BaseScript 會移除，RenderStepped 不重掃 descendants。
+  motion:
+    - "低幅 idle sway + mouse sway"
+    - "落地移動時 walk bob；LeftShift+moving 時 visual-only sprint pose"
+    - "每次 local shot 透過 ViewmodelState 加入 spring recoil"
+    - "ReloadStateChanged authoritative duration 驅動 weapon/left-hand reload phases"
+    - "camera forward raycast 在牆前下壓並拉回 ViewModel，避免穿牆"
+  presentation: |
+    所有武器共用這個 ViewModel。真實武器品牌名稱不進入遊戲；
+    Viper Aurum 作為 Golden Viper（金色手槍）呈現，第一人稱用雙手握持。
+    第三人稱 Pistol / Knife 仍維持單手。
 
-left_hand_ik:
-  state: disabled
+third_person_two_hand_grip:
+  state: "server physical solver disabled; client animation pose active"
   reason: |
     舊 server-side grip solver 會透過物理 constraint 拖動 HumanoidRootPart，
-    造成玩家與 NPC 漂移（#56）。ViewmodelController 目前只維持手臂可見。
-  open_issue: "#39 — non-propulsive two-hand hold pose"
+    造成玩家與 NPC 漂移（#56），因此永久保持 disabled。
+  replacement: |
+    ViewmodelController 在每個 client 監看所有 player character；Tool.Handle.LeftGrip
+    存在時以 R15Pose persistent PreSimulation transform 維持 TwoHandHold。
+    MatchManager 的 server-owned FinalStrikeReloading attribute 會在 reload 期間暫停
+    normal hold，讓 published clip / procedural fallback 單獨控制 arm joints。
+  single_handed: "Pistol / Knife 沒有 LeftGrip，因此不套 TwoHandHold"
+  two_client_e2e_2026_07_12:
+    topology: "StudioTestService Server & Clients，2 Players；Player1 shooter、Player2 remote observer"
+    idle: "observer LeftHand→LeftGrip 0.00663 studs；0 physical off-hand constraints"
+    run: "observer 在 16.01 studs/s、MoveDirection=1 時 gap 0.00663 studs"
+    jump_freefall: "observer 看到 7.20-stud jump arc、17.47 studs/s upward velocity、Freefall→Landed；max gap 0.00664 studs"
+    stationary_safety: "1.5s observer horizontal drift 0.00086 studs；無 RootPart propulsion"
+    reload: "FinalStrikeReloading=true 時 gap 2.942 studs（hold released）；false 後恢復 0.00663 studs"
+    local_reload_resume: "server attribute→RemoteEvent finish order下，第3 frame gap 0.0443、第8 frame 0.00663；無額外 0.1s rest-pose dead time"
+    single_handed: "observer 對 Viper Mk1 / Fang Scout 均看到 no LeftGrip、0 off-hand constraints"
+    golden_viper: "shooter camera-local ViewModel 有左右手、3 個 Motor6D、2 個 gold parts；0 BaseScripts / 0 physical constraints"
 
 reload_animation:
   authoritative_timing: "MatchManager 提供 ReloadTime；client clip 依該 duration 調速"
@@ -94,14 +129,23 @@ crosshair_aligned_aim:
 
 artifacts:
   - src/StarterPlayerScripts/CameraController.lua  (130 行 — 主控)
-  - src/StarterPlayerScripts/ViewmodelController.lua  (arms 可見)
-  - src/StarterPlayerScripts/WeaponClient.lua  (crosshair aim + reload animation/fallback)
+  - src/StarterPlayerScripts/FirstPersonViewmodel.lua  (camera-local Motor6D hands + weapon)
+  - src/StarterPlayerScripts/ViewmodelController.lua  (all-player third-person two-hand pose)
+  - src/StarterPlayerScripts/WeaponClient.lua  (crosshair aim + reload + local recoil/muzzle)
   - src/ReplicatedStorage/R15Pose.lua  (non-physical upper-body pose controller)
+  - src/ReplicatedStorage/ViewmodelState.lua  (local-only recoil + active muzzle state)
   - src/StarterPlayerScripts/HUDController.lua  (crosshair ScreenGui FinalStrikeCrosshair)
   - src/ServerScriptService/MatchManager.lua  (FireWeapon handler 接收 client crosshair-aligned direction)
 
 success_criteria:
-  - "比賽中鎖第一人稱，玩家看到自己的手 + 武器"
+  - "比賽中鎖第一人稱，CurrentCamera 下有 local-only ViewModel、左右 R15 Hand 與武器"
+  - "ViewModel 每個 RenderStepped 精確跟 camera，並有 idle sway / walk bob / sprint / recoil / reload / wall pushback"
+  - "第一人稱隱藏真實本機手臂與 Tool；退出第一人稱、死亡、換槍、重生時完整還原與清理"
+  - "Viper Aurum 以 Golden Viper 金色外觀、第一人稱雙手握持；真實品牌名稱不使用"
+  - "SMG / Rifle / Shotgun / Sniper / Minigun 在 idle / run / jump / freefall / land 維持雙手 pose"
+  - "Pistol / Knife 維持單手；切槍、死亡、重生、character removal 不殘留 pose controller"
+  - "reload 期間 normal hold 暫停，結束或取消後恢復，沒有 controller 互搶"
+  - "two-hand pose 不建立 physical grip constraint、不寫 HumanoidRootPart，stationary 無漂移"
   - "Pistol / Rifle / Shotgun 使用對應、由 Final Strike owner 發布的 R15 reload clip"
   - "SMG / Sniper / Minigun 使用程序化 reload fallback，不冒用錯誤武器 clip"
   - "reload 取消或換槍時不殘留 AnimationTrack / R15Pose task"
@@ -110,6 +154,7 @@ success_criteria:
   - "被淘汰玩家切回三人稱觀戰（#11）"
   - "Bullet 從螢幕中心發射對齊 crosshair（不是從 muzzle 偏右）"
   - "大廳 / Match End 階段釋放鼠標"
+  - "camera ViewModel 僅含 anchored root + non-physical parts/Motor6D；不新增任何物理 grip constraint"
 
 recovery:
   - "鼠標卡 LockCenter 點不到 UI → releaseEnforceUntil 機制 / interactive_uis_set 是否註冊"
@@ -117,12 +162,13 @@ recovery:
   - "reload clip 不播放 → 檢查 GameConfig ID ownership；client 會預載，60 frames 仍未 ready 才切 fallback"
   - "reload pose 殘留 → 檢查 ReloadStateChanged(false) 與 reloadGeneration cancellation"
   - "Bullet 不對齊 crosshair → WeaponClient raycast origin 是否改成 camera center"
+  - "第一人稱武器不見 → 檢查 CurrentCamera.FinalStrikeViewModel、裝備 Tool、CameraMode 與 ViewmodelState muzzle"
+  - "牆前穿模 → 檢查 ViewModel raycast exclude list 與 wall pushback Transform"
 
 # ============= 已知限制 / Sprint 8b+ 候選 =============
 known_limitations:
   - "muzzle flash 仍 client-only（Sprint 7 lesson）— 跨玩家可見要 server-side flash event"
   - "Crosshair 是 4-segment open-center（commit d054043 CEO spec），未對應稀有度顏色"
-  - "一般持槍時的非物理雙手 pose 尚未接回；#39 保持 open"
 
 # ============= 依賴 =============
 dependencies:
@@ -132,4 +178,5 @@ dependencies:
   events_observed:
     - PhaseChanged
     - PlayerEliminated
+    - ReloadStateChanged
     - GUI Enabled changes (ShopUI / DailyQuestUI)
