@@ -23,3 +23,13 @@ artifacts:
 recovery:
   - 多人同時踩啟動台重複觸發 → 加 MatchRunning guard
   - 斷線玩家未清理 → PlayerRemoving 事件處理
+
+# 補充（Sprint: 1v1 Duel Mode）
+compat_notes: |
+  startMatch/teleportToArena/resetToLobby 新增了 3 處最小相容性 guard：
+  跳過 `_G.DuelService.isDueling(player)` 為 true 的玩家（不給 playerData、
+  不傳送、resetToLobby 不 LoadCharacter 他們）。這是為了讓獨立的 1v1 對決
+  模式（見 workloads/17-duel-mode.yaml）能與這裡的狀態機完全隔離、不互相
+  干擾 —— 本體的 5 階段循環、規則、獎勵邏輯未變。DuelService 未載入時
+  （`_G.DuelService` 為 nil）這幾處 guard 直接短路為原本行為，對沒有
+  1v1 模式的環境零影響。

@@ -77,6 +77,13 @@ makeRemoteEvent("EnterTrainingArena")   -- server → client: open weapon picker
 makeRemoteEvent("SelectTrainingWeapon") -- client → server: weaponName (any weapon, no ownership)
 makeRemoteEvent("ExitTrainingArena")    -- server → client: close weapon picker (on leave)
 
+-- 1v1 Duel mode (separate from the 12-player match; combat itself reuses
+-- FireWeapon/ReloadWeapon/HealthUpdate/AmmoUpdate/PhaseChanged/Announcement/
+-- PlayerEliminated above, targeted with FireClient at just the two duelists).
+makeRemoteEvent("DuelVoteOpen")     -- server → the 2 paired clients: map option list + vote seconds
+makeRemoteEvent("DuelVoteCast")     -- client → server: chosen mapId
+makeRemoteEvent("DuelVoteClosed")   -- server → the 2 paired clients: resolved mapId + mapName
+
 -- Initial-state queries (sync, avoid client/server subscribe race on player join)
 makeRemoteFunction("GetCurrency")       -- client → server, returns int coin balance
 makeRemoteFunction("GetOwnedWeapons")   -- client → server, returns sorted list of owned weapon names

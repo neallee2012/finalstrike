@@ -25,6 +25,13 @@ GameConfig.MAX_RESERVE_MAGAZINES = 15
 -- See proposals/sprint-8-200hp-balance.md §3.5 for full rationale.
 GameConfig.HEADSHOT_MULTIPLIER = 2.0
 
+-- 1v1 Duel mode (separate lifecycle from the 12-player match; see DuelService).
+GameConfig.DUEL = {
+	VOTE_SECONDS = 10,          -- time both players get to vote on a map
+	COUNTDOWN = 3,              -- seconds after teleport before combat enables
+	RESULT_DISPLAY_SECONDS = 4, -- how long the win/loss banner shows before cleanup
+}
+
 -- Match phases
 GameConfig.PHASE = {
 	LOBBY = "Lobby",

@@ -487,31 +487,38 @@ function MatchManager.resetToLobby()
 	-- Defensive Tool destroy (#35 / #38): even though LoadCharacter destroys
 	-- the existing character (and its Tool with it), some Roblox versions
 	-- can race here. Explicitly destroying any equipped Tool first guarantees
-	-- the lobby spawn is gun-less.
+	-- the lobby spawn is gun-less. Skips players mid-1v1-duel (their own
+	-- Tool/character lifecycle is owned by DuelService, not this reset).
 	for _, player in ipairs(Players:GetPlayers()) do
-		local char = player.Character
-		if char then
-			for _, c in ipairs(char:GetChildren()) do
-				if c:IsA("Tool") then c:Destroy() end
+		if not (_G.DuelService and _G.DuelService.isDueling(player)) then
+			local char = player.Character
+			if char then
+				for _, c in ipairs(char:GetChildren()) do
+					if c:IsA("Tool") then c:Destroy() end
+				end
 			end
 		end
 	end
 
 	-- Teleport all players to lobby + reset HUD HP back to full (#18) so the
 	-- HP bar doesn't keep showing whatever it was at when the match ended.
+	-- Same dueling-player skip as above — resetting this match must never
+	-- respawn/reposition someone mid-duel in a different arena.
 	local healthUpdate = events:WaitForChild("HealthUpdate")
 	for _, player in ipairs(Players:GetPlayers()) do
-		player:LoadCharacter()
-		task.wait(0.5)
-		if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-			local lobbySpawn = workspace:FindFirstChild("LastZone")
-				and workspace.LastZone:FindFirstChild("Lobby")
-				and workspace.LastZone.Lobby:FindFirstChild("LobbySpawn")
-			if lobbySpawn then
-				player.Character.HumanoidRootPart.CFrame = lobbySpawn.CFrame + Vector3.new(0, 3, 0)
+		if not (_G.DuelService and _G.DuelService.isDueling(player)) then
+			player:LoadCharacter()
+			task.wait(0.5)
+			if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+				local lobbySpawn = workspace:FindFirstChild("LastZone")
+					and workspace.LastZone:FindFirstChild("Lobby")
+					and workspace.LastZone.Lobby:FindFirstChild("LobbySpawn")
+				if lobbySpawn then
+					player.Character.HumanoidRootPart.CFrame = lobbySpawn.CFrame + Vector3.new(0, 3, 0)
+				end
 			end
+			healthUpdate:FireClient(player, GameConfig.MAX_HP, GameConfig.MAX_HP)
 		end
-		healthUpdate:FireClient(player, GameConfig.MAX_HP, GameConfig.MAX_HP)
 	end
 
 	Announcement:FireAllClients("WAITING FOR MATCH...")
@@ -526,7 +533,11 @@ function MatchManager.teleportToArena()
 	local spawnList = spawns:GetChildren()
 	local i = 1
 	for _, player in ipairs(Players:GetPlayers()) do
-		if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+		-- Skip players mid-1v1-duel — they stay in their duel arena instead
+		-- of being yanked into the 12p arena (see startMatch's participants
+		-- guard for the full rationale).
+		local dueling = _G.DuelService and _G.DuelService.isDueling(player)
+		if not dueling and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
 			local sp = spawnList[((i - 1) % #spawnList) + 1]
 			player.Character.HumanoidRootPart.CFrame = sp.CFrame + Vector3.new(0, 3, 0)
 			i = i + 1
@@ -539,13 +550,25 @@ function MatchManager.startMatch()
 	if MatchManager.MatchRunning then return end
 	MatchManager.MatchRunning = true
 
-	-- Reset placement tracking and snapshot player count for placement math
+	-- Reset placement tracking and snapshot player count for placement math.
+	-- Players mid-1v1-duel are excluded entirely from this match — they keep
+	-- their duel session, are never teleported here, and are neither counted
+	-- toward TotalPlayers nor given MatchManager.playerData. Without this,
+	-- a duelist could get double-processed by both this match's FireWeapon
+	-- handler and DuelService's own, and would otherwise be yanked out of an
+	-- in-progress duel mid-fight.
 	MatchManager.EliminationOrder = {}
-	MatchManager.TotalPlayers = #Players:GetPlayers()
-
-	-- Initialize all current players + reset their per-match earning caps so
-	-- the previous match's cap doesn't leak into this one.
+	local participants = {}
 	for _, player in ipairs(Players:GetPlayers()) do
+		if not (_G.DuelService and _G.DuelService.isDueling(player)) then
+			table.insert(participants, player)
+		end
+	end
+	MatchManager.TotalPlayers = #participants
+
+	-- Initialize all current (non-dueling) players + reset their per-match
+	-- earning caps so the previous match's cap doesn't leak into this one.
+	for _, player in ipairs(participants) do
 		MatchManager.initPlayerData(player)
 		MatchManager.AlivePlayers[player] = true
 		if _G.CurrencyService then _G.CurrencyService.resetMatchCaps(player) end
@@ -823,7 +846,13 @@ events:WaitForChild("FireWeapon").OnServerEvent:Connect(function(player, origin,
 end)
 
 -- Reload handler
+-- Skip players mid-1v1-duel: unlike FireWeapon (which no-ops cleanly for
+-- players with no playerData), MatchManager.syncReloadState's fallback path
+-- still FireClients a "not reloading" ReloadStateChanged even with no
+-- playerData, which clobbers DuelService's own in-progress reload state for
+-- the same shared RemoteEvent. Guard needed for real isolation.
 events:WaitForChild("ReloadWeapon").OnServerEvent:Connect(function(player)
+	if _G.DuelService and _G.DuelService.isDueling(player) then return end
 	if not MatchManager.startReload(player) then
 		MatchManager.syncReloadState(player)
 	end

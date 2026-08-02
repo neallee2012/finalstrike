@@ -2,7 +2,10 @@
 -- Procedural generation of lobby, arena, and spectator areas
 
 local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LobbyBuilder = require(script.Parent:WaitForChild("LobbyBuilder"))
+local DuelArenaBuilder = require(script.Parent:WaitForChild("DuelArenaBuilder"))
+local DuelMaps = require(ReplicatedStorage:WaitForChild("DuelMaps"))
 
 local MAP = {}
 
@@ -504,6 +507,26 @@ function MAP.buildTrainingArena(parent)
 	return zone
 end
 
+-- ============ 1v1 DUEL ARENAS ============
+-- Builds every registered DuelMaps entry once at server start, each in its
+-- own Folder under LastZone.DuelArenas.<MapId>, spaced far apart so future
+-- maps never overlap each other or the rest of LastZone. DuelService just
+-- looks these up by name at match time — nothing here is rebuilt per-duel.
+function MAP.buildDuelArenas(parent)
+	local duelArenas = Instance.new("Folder")
+	duelArenas.Name = "DuelArenas"
+	duelArenas.Parent = parent
+
+	local SPACING = 300
+	local BASE = Vector3.new(-500, 0, 0)  -- clear of Lobby/Arena/Spectator/TrainingArena
+	for index, mapDef in ipairs(DuelMaps.list()) do
+		local center = BASE - Vector3.new((index - 1) * SPACING, 0, 0)
+		DuelArenaBuilder.build(mapDef.Id, duelArenas, center)
+	end
+
+	return duelArenas
+end
+
 -- ============ BUILD ALL ============
 function MAP.buildAll()
 	setupAtmosphere()
@@ -532,6 +555,7 @@ function MAP.buildAll()
 	MAP.buildArena(mapFolder)
 	MAP.buildSpectatorArea(mapFolder)
 	MAP.buildTrainingArena(mapFolder)
+	MAP.buildDuelArenas(mapFolder)
 
 	print("[MapBuilder] Map generated successfully!")
 	return mapFolder

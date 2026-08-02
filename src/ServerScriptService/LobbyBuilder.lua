@@ -672,7 +672,49 @@ local function buildBays(lobby)
 	})
 
 	local duelBay = buildBayFrame(left, -1, 0, "OneVsOneBay", "1V1 ARENA")
-	addArenaCue(duelBay, -1, 0, "1V1")
+	addArenaCue(duelBay, -1, 0, "1V1 QUEUE")
+
+	-- Touch to join the 1v1 duel queue; touch again to leave (DuelService owns
+	-- the toggle logic, mirroring TrainingArenaPortal's touch-pad pattern).
+	makePart(lobby, {
+		Name = "DuelQueuePortal",
+		Size = Vector3.new(2, 12, 14),
+		CFrame = CFrame.new(-32.5, 6, 0),
+		Color = COLORS.Red,
+		Material = Enum.Material.SmoothPlastic,
+		Transparency = 1,
+		CanCollide = false,
+		CanTouch = true,
+		CanQuery = false,
+		CastShadow = false,
+	})
+
+	-- Live queue count readout — DuelService updates CountLabel.Text directly.
+	local queueSign = makePart(duelBay, {
+		Name = "DuelQueueSign",
+		Size = Vector3.new(0.3, 2, 6),
+		CFrame = CFrame.new(-37.7, 5, 0),
+		Color = COLORS.Black,
+		Material = Enum.Material.SmoothPlastic,
+		CanCollide = false,
+	})
+	local queueGui = Instance.new("SurfaceGui")
+	queueGui.Name = "QueueGui"
+	queueGui.Face = Enum.NormalId.Right
+	queueGui.LightInfluence = 0
+	queueGui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	queueGui.PixelsPerStud = 40
+	queueGui.Parent = queueSign
+	local countLabel = Instance.new("TextLabel")
+	countLabel.Name = "CountLabel"
+	countLabel.Size = UDim2.new(1, 0, 1, 0)
+	countLabel.BackgroundTransparency = 1
+	countLabel.Text = "1V1 QUEUE: 0/2"
+	countLabel.TextColor3 = COLORS.White
+	countLabel.TextScaled = true
+	countLabel.Font = Enum.Font.GothamBold
+	countLabel.TextStrokeTransparency = 0.5
+	countLabel.Parent = queueGui
 
 	local shopBay = buildBayFrame(left, -1, 45, "WeaponShopBay", "WEAPON SHOP")
 	addWeaponWall(shopBay, -1, 45, {
