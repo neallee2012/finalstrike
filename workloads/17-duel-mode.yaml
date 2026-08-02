@@ -1,0 +1,164 @@
+name: DuelMode
+owner: claude-code
+priority: P1-mode
+status: 🚧 IMPLEMENTED (repo) — Studio MCP unavailable this session, live two-player playtest NOT run (see verification section)
+
+# ============= 系統定位 =============
+purpose: |
+  獨立的 1v1 對決模式，與現有 12 人 Final Strike 主流程完全分離、互不干擾。
+  兩位在大廳排隊的玩家配對後投票選地圖（平票隨機決勝），傳送到該地圖的
+  SpawnA/SpawnB，倒數後開戰，淘汰或斷線判定勝負，結束後清理狀態並送回大廳。
+
+architecture_decision: |
+  1v1 生命週期完全獨立於 MatchManager（不共用 playerData / PvPEnabled，
+  不新增第二套狀態機進 MatchManager）。武器開火/換彈重用既有的
+  FireWeapon / ReloadWeapon RemoteEvent 與 ReloadLogic 模組，但由
+  DuelService 自己的 OnServerEvent 監聽器處理傷害判定 —
+  MatchManager 對同一組 RemoteEvent 的監聽器對決鬥雙方是 no-op
+  （他們沒有 MatchManager.playerData），因此不會重複傷害或彈藥衝突。
+
+  HP/Ammo/Phase/Announcement/PlayerEliminated/EquipWeapon/WeaponHit 皆透過
+  FireClient 只送給該場對決的兩位玩家，不影響其他人；PhaseChanged 刻意重用
+  "PvE"/"PvPWarning"/"PvP"/"MatchEnd" 這幾個既有字串，因為 CameraController.lua
+  正是靠這些字串切換第一人稱鎖定鏡頭 + crosshair（inArena 邏輯），對決因此
+  自動獲得與 12 人模式一致的戰鬥視角，不需要新的客戶端鏡頭程式碼。
+
+# ============= 地圖註冊介面 =============
+map_registry:
+  client_safe_metadata: src/ReplicatedStorage/DuelMaps.lua
+  server_only_builders: src/ServerScriptService/DuelArenaBuilder.lua
+  extension_contract: |
+    新增一張地圖只需要兩處編輯，其餘（DuelService、投票 UI、MapBuilder）都
+    不用改：
+      1. DuelMaps.lua 呼叫一次 DuelMaps.register({ Id=, Name=, Description= })
+      2. DuelArenaBuilder.lua 的 `builders` dispatch table 新增一個以同一個
+         Id 為 key 的 builder function，內部建立 SpawnA / SpawnB Part
+  tie_break: |
+    DuelMaps.resolveVoteFrom(idList, counts) 是純函式：統計最高票，若多個
+    地圖同票則用 math.random 在同票組內均勻抽一個。resolveVote(counts) 是
+    對真實登錄清單的包裝。只有 1 張地圖時，resolveVote({}) 必為該地圖
+    （非隨機），滿足「單地圖行為需確定性」的驗收條件。
+  first_map: |
+    BunkerCrossfire — 依 CEO 附圖重製的對稱掩體地圖：後方兩側出生碉堡
+    （保護出口 + 貼近出生點的斜坡）、置中的 CentralBlocker 保證雙方出生點
+    之間無直線對狙、密集中央掩體（高低混合）、單一路線的左翼、右側降低
+    高度並加前方掩體的高台（含樓梯）。約 60 個 BasePart／8 盞燈，遠低於
+    <=300 Part / <=20 燈的預算。
+
+# ============= 佇列 / 配對 =============
+queue:
+  entry_point: "LobbyBuilder.lua 的 DuelQueuePortal（觸碰式，比照 TrainingArenaPortal）"
+  toggle_behavior: "同一個 pad：第一次觸碰加入佇列，佇列中再次觸碰離開佇列（1.5s 防抖動）"
+  label: "OneVsOneBay 的 ArenaCue 文字改為「1V1 QUEUE」+ DuelQueueSign 即時顯示 X/2"
+  pairing: |
+    FIFO，滿 2 人立即嘗試配對；配對後任一方無法再排隊（playerDuel 非 nil 即拒絕）。
+    配對當下會對兩位候選人「重新」檢查 isBlockedByMatch —— 因為單純排隊中
+    （尚未配對成功、無 session）不受 MatchManager 的 isDueling 排除 guard
+    保護，若 12 人賽在其中一人排隊等待期間開始並吸收了他（給了他
+    MatchManager.playerData），配對當下會擋下、只重新排回仍然有效的一方，
+    避免對一個已經是 12 人賽場上玩家的人建立 duel session（否則會重現同一種
+    雙重處理 race）。
+  soft_block: "MatchManager.MatchRunning 且該玩家有未淘汰的 12 人賽 playerData 時拒絕排隊／配對（isBlockedByMatch，比照 TrainingService 的既有判斷，且在 queueToggle 與配對當下都會呼叫）"
+
+# ============= 對決流程 =============
+lifecycle:
+  states: [Voting, Resolving, Countdown, Combat, Ended]
+  voting: |
+    DuelVoteOpen(options, VOTE_SECONDS) 送給雙方；DuelVoteCast 驗證：
+    session 存在、狀態為 Voting、mapId 是已註冊地圖、玩家未重複投票。
+    雙方都投完，或逾時 (GameConfig.DUEL.VOTE_SECONDS=10s) 觸發
+    resolveMapAndStartCountdown。
+  countdown: |
+    傳送到 SpawnA/SpawnB、HP/Ammo 重置、attachWeapon、PhaseChanged("PvE")
+    鎖鏡頭，倒數 GameConfig.DUEL.COUNTDOWN=3s（PhaseChanged("PvPWarning")）。
+    戰鬥判定只在 session.State=="Combat" 才生效，因此倒數期間、出生保護
+    完全由狀態機保證，不需要額外的無敵判定。
+  combat: |
+    PhaseChanged("PvP") 開戰。DuelService 自己的 FireWeapon 監聽器比照
+    MatchManager 的反作弊（origin 距離、fire-rate、raycast Exclude 自己）,
+    但只在命中「同一場對決的對手」時才呼叫 applyDamage。
+  end: |
+    HP<=0 或斷線都呼叫唯一的結束路徑（session.Ended 保證只結束一次）。
+    PlayerEliminated 給輸家做鏡頭脫離、Announcement 給雙方顯示勝負，
+    RESULT_DISPLAY_SECONDS=4s 後 cleanupSession：傳回 LobbySpawn、清 Tool、
+    HealthUpdate/AmmoUpdate 重置、PhaseChanged("Lobby")、playerDuel 清空。
+  forfeit: "Players.PlayerRemoving 若玩家在未結束的對決中，判對手獲勝，走同一個 cleanupSession"
+  respawn_safety: "CharacterAdded 若在未結束的對決期間真的重生（如意外摔死），視為淘汰，避免殘留 state"
+
+# ============= 12 人模式互不干擾 =============
+interference_guard: |
+  MatchManager.lua 新增了一個最小、純附加的相容性 guard（非重構）：
+  startMatch 組 participants 清單、teleportToArena、resetToLobby 這三處迴圈
+  都改為「若 _G.DuelService.isDueling(player) 為 true 就跳過」。原因：
+  code-review 抓到一個真實的高風險 bug — 若不排除，startMatch 會在
+  initPlayerData/teleportToArena 之後、setPhase(PvE) 之前有數秒空窗，此時
+  對決雙方會同時擁有 MatchManager.playerData 與 DuelService session，兩套
+  FireWeapon/ReloadWeapon 監聽器會各自獨立處理同一次開火/換彈，送出互相衝突
+  的 AmmoUpdate/WeaponHit/HealthUpdate 給同一個 client；resetToLobby 也會用
+  LoadCharacter 強制重生正在決鬥中的玩家，把他們的角色從決鬥地圖硬拉回大廳。
+  加了這個 guard 後，已配對（Voting/Countdown/Combat 任何階段）的對決會與
+  12 人賽完全隔離、互不影響，不需要在對決端再做任何清理。
+  DuelService 這邊只保留一件事：清空尚未配對的佇列（因為單純排隊中、還沒
+  configured session 的玩家不受 MatchManager guard 保護，12 人賽開始時會
+  正常把他們一起帶進 Arena，若不清空佇列，稍後配對成功會對一個已經在打
+  12 人賽的玩家彈出投票 UI）。
+
+remote_events:
+  DuelVoteOpen: "server → 配對到的兩位 client；(options: {Id,Name,Description}[], seconds)"
+  DuelVoteCast: "client → server；mapId"
+  DuelVoteClosed: "server → 兩位 client；{MapId, MapName}"
+  reused_via_fireclient: "FireWeapon / ReloadWeapon (client→server) 與 HealthUpdate / AmmoUpdate / ReloadStateChanged / EquipWeapon / WeaponHit / PhaseChanged / TimerUpdate / Announcement / PlayerEliminated (server→client)"
+
+artifacts:
+  - src/ReplicatedStorage/DuelMaps.lua  (地圖 metadata 登錄 + 平票決勝純函式)
+  - src/ServerScriptService/DuelArenaBuilder.lua  (BunkerCrossfire 幾何建構)
+  - src/ServerScriptService/DuelService.lua  (佇列/投票/倒數/戰鬥/清理狀態機)
+  - src/ServerScriptService/MapBuilder.lua  (buildDuelArenas，server 啟動時建好所有已註冊地圖)
+  - src/ServerScriptService/LobbyBuilder.lua  (DuelQueuePortal + DuelQueueSign)
+  - src/ServerScriptService/GameEventsBootstrap.lua  (DuelVoteOpen/DuelVoteCast/DuelVoteClosed)
+  - src/ReplicatedStorage/GameConfig.lua  (GameConfig.DUEL 調校值)
+  - src/StarterPlayerScripts/DuelVoteUI.lua  (通用地圖投票 UI，不寫死地圖數量)
+  - src/ServerScriptService/Tests/DuelMaps.spec.lua  (平票決勝 TestEZ 測試)
+  - src/ServerScriptService/MatchManager.lua  (startMatch/teleportToArena/resetToLobby 新增 isDueling 排除 guard；狀態機本體未變)
+
+success_criteria:
+  - "現有 12 人 Lobby → PvE → PvP → MatchEnd 狀態機、規則、獎勵完全不變（MatchManager 只多了 3 處 isDueling 排除 guard，非重構）"
+  - "兩位玩家排隊、配對、投票皆正確；重複/逾時/非參與者投票被拒絕"
+  - "平票時決勝有隨機性（DuelMaps.spec.lua 200~300 次抽樣涵蓋所有平票地圖）；單一地圖時 resolveVote 100% 決定性"
+  - "倒數/出生保護期間無法造成傷害（FireWeapon 監聽器以 session.State==Combat 把關）"
+  - "淘汰與斷線都恰好觸發一次結算（session.Ended 冪等guard）"
+  - "對決結束後雙方 HP/彈藥/Phase/鏡頭狀態/Tool 完全清理，回到大廳"
+  - "重新排隊可以進行第二場對決，不殘留前一場狀態"
+  - "非對決/非 12 人賽玩家不受影響"
+
+verification:
+  automated: "DuelMaps.spec.lua 已寫好（TestEZ，需啟用 Tests/Runner.server.lua 才會執行 — 與既有 CurrencyMath/ReloadLogic 套件一致）"
+  studio_live_playtest: |
+    本次 session 未偵測到已連線的 Roblox Studio MCP 實例
+    （roblox-studio-list_roblox_studios 回傳空陣列），因此未執行雙人
+    Server & Clients 實機測試。以下驗收項目尚未有實機證據，需要下一個
+    有 Studio 連線的 session 補測：
+      - 佇列/配對/投票 UI 實際顯示與點擊
+      - 平票隨機性在真實 Studio 環境重現
+      - 倒數期間無敵、開戰後正常傷害
+      - 淘汰/斷線流程與清理後可重新排隊
+      - 與 12 人賽同時進行時的互不干擾
+      - FPS/Part 數量實測（設計預算：<=300 Part、<=20 燈、目標 FPS>=50）
+
+recovery:
+  - "DuelQueuePortal 觸碰無反應 → 確認 workspace.LastZone.Lobby.DuelQueuePortal 存在，且 DuelService 的 task.spawn WaitForChild 沒有卡住"
+  - "投票 UI 沒開啟 → 檢查 DuelVoteOpen RemoteEvent 是否在 GameEventsBootstrap 建立"
+  - "地圖找不到 → workspace.LastZone.DuelArenas.<MapId> 是否存在；MapBuilder.buildDuelArenas 是否有跑"
+  - "傷害沒生效 → 確認 session.State == 'Combat'（倒數/投票期間傷害本來就該被擋）"
+  - "殘留佇列/對決狀態 → 檢查 Players.PlayerRemoving 與 PhaseChangedServer(PvE) 清理路徑"
+
+# ============= 依賴 =============
+dependencies:
+  upstream:
+    - GameConfig.WEAPONS / MAX_HP / STARTING_RESERVE_MAGAZINES / DUEL
+    - ReloadLogic (ServerStorage, 純邏輯重用)
+    - ShopService.getPrimary (決鬥武器＝玩家目前裝備的主武器)
+    - MatchManager.attachWeapon / PhaseChangedServer / MatchRunning / getPlayerData (讀取重用)
+  downstream:
+    - DuelVoteUI.lua (client, 依 DuelMaps 清單動態渲染)
+    - MatchManager.startMatch / teleportToArena / resetToLobby (新增 isDueling 排除 guard，呼叫 DuelService.isDueling 唯讀查詢)

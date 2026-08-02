@@ -1,6 +1,7 @@
 # Final Strike - Roblox Studio Prototype
 
 A 12-player survival shooter for Roblox. PvE loot phase → PvP elimination.
+A separate 1v1 duel mode (queue → map vote → countdown → combat) runs alongside it.
 
 ## Setup in Roblox Studio
 
@@ -25,10 +26,12 @@ A 12-player survival shooter for Roblox. PvE loot phase → PvP elimination.
 - **CurrencyService.lua / ShopService.lua** - BulletCoin persistence and 30-weapon ownership/loadout
 - **DailyQuestService.lua** - UTC-reset daily quest progress and rewards
 - **TrainingService.lua** - Training arena entry, exit, and unrestricted weapon selection
+- **DuelService.lua** - Standalone 1v1 duel mode: queue, map vote, countdown, combat, and cleanup, fully separate from MatchManager
+- **DuelMaps.lua / DuelArenaBuilder.lua** - 1v1 map registry (client-safe metadata + tie-break vote resolver) and server-only arena geometry builders
 - **WeaponMeshes.lua** - Tool-based weapon model builders and grip setup
 - **HUDController.lua / WeaponClient.lua** - HUD, firing input, reload input, and local weapon FX
 - **ViewmodelController.lua / CameraController.lua** - First-person arms, crosshair, and camera behavior
-- **ShopController.lua / DailyQuestUI.lua / TrainingArenaUI.lua** - Interactive client UI
+- **ShopController.lua / DailyQuestUI.lua / TrainingArenaUI.lua / DuelVoteUI.lua** - Interactive client UI
 - **NPCWeaponEffectsClient.lua** - Client-only NPC muzzle flash and tracer FX
 
 ## Verification
