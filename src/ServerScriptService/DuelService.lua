@@ -171,6 +171,11 @@ local function cleanupSession(session)
 				PhaseChanged:FireClient(p, GameConfig.PHASE.LOBBY)
 				HealthUpdate:FireClient(p, GameConfig.MAX_HP, GameConfig.MAX_HP)
 				AmmoUpdate:FireClient(p, 0, 0, 0)
+				-- Clear any in-progress reload state/pose. Without this, a
+				-- duelist eliminated/disconnected/forfeited mid-reload keeps
+				-- the FinalStrikeReloading attribute (and client reload bar)
+				-- stuck active after being teleported back to the lobby.
+				pushReloadState(p, false, 0, nil)
 			end
 		end
 	end
@@ -496,9 +501,12 @@ local function createSession(playerA, playerB)
 end
 
 -- Public read-only check so other systems (currently only MatchManager,
--- via the compatibility guard added to startMatch/teleportToArena) can avoid
--- double-processing a player who is mid-duel. DuelService never calls into
--- MatchManager beyond this — the guard lives on the MatchManager side.
+-- via the compatibility guard added to startMatch/teleportToArena/
+-- resetToLobby/ReloadWeapon) can avoid double-processing a player who is
+-- mid-duel. DuelService does call into MatchManager elsewhere in this file
+-- (attachWeapon, MatchRunning/getPlayerData, PhaseChangedServer) — this
+-- function is just the one read-only query MatchManager calls back into
+-- DuelService for; it is not a statement that the coupling is one-directional.
 function DuelService.isDueling(player)
 	return playerDuel[player] ~= nil
 end

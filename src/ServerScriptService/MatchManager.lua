@@ -846,7 +846,13 @@ events:WaitForChild("FireWeapon").OnServerEvent:Connect(function(player, origin,
 end)
 
 -- Reload handler
+-- Skip players mid-1v1-duel: unlike FireWeapon (which no-ops cleanly for
+-- players with no playerData), MatchManager.syncReloadState's fallback path
+-- still FireClients a "not reloading" ReloadStateChanged even with no
+-- playerData, which clobbers DuelService's own in-progress reload state for
+-- the same shared RemoteEvent. Guard needed for real isolation.
 events:WaitForChild("ReloadWeapon").OnServerEvent:Connect(function(player)
+	if _G.DuelService and _G.DuelService.isDueling(player) then return end
 	if not MatchManager.startReload(player) then
 		MatchManager.syncReloadState(player)
 	end

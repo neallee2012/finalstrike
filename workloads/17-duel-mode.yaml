@@ -13,9 +13,18 @@ architecture_decision: |
   1v1 生命週期完全獨立於 MatchManager（不共用 playerData / PvPEnabled，
   不新增第二套狀態機進 MatchManager）。武器開火/換彈重用既有的
   FireWeapon / ReloadWeapon RemoteEvent 與 ReloadLogic 模組，但由
-  DuelService 自己的 OnServerEvent 監聽器處理傷害判定 —
-  MatchManager 對同一組 RemoteEvent 的監聽器對決鬥雙方是 no-op
-  （他們沒有 MatchManager.playerData），因此不會重複傷害或彈藥衝突。
+  DuelService 自己的 OnServerEvent 監聽器處理傷害判定。
+  FireWeapon：MatchManager 對同一組 RemoteEvent 的監聽器對決鬥雙方天然是
+  no-op（`local data = playerData[player]; if not data ... return end`，
+  沒有任何副作用分支），因此不會重複傷害或彈藥衝突。
+  ReloadWeapon：MatchManager 的監聽器並非天然 no-op —
+  `MatchManager.startReload` 對無 playerData 的玩家回傳 false 後，
+  handler 會呼叫 `MatchManager.syncReloadState`，其 `not data` 分支仍會
+  FireClient 一次 `ReloadStateChanged(false, 0, nil)`，蓋掉 DuelService
+  剛送出的真實換彈狀態（同一個 RemoteEvent、同一次觸發，兩個監聽器都會跑）。
+  此為本次 review 抓到的真實 bug，已在 MatchManager.lua 的 ReloadWeapon
+  handler 加上 `isDueling` 提前 return 修正（第 4 處 guard，見下方
+  interference_guard）。
 
   HP/Ammo/Phase/Announcement/PlayerEliminated/EquipWeapon/WeaponHit 皆透過
   FireClient 只送給該場對決的兩位玩家，不影響其他人；PhaseChanged 刻意重用
@@ -87,17 +96,24 @@ lifecycle:
 
 # ============= 12 人模式互不干擾 =============
 interference_guard: |
-  MatchManager.lua 新增了一個最小、純附加的相容性 guard（非重構）：
-  startMatch 組 participants 清單、teleportToArena、resetToLobby 這三處迴圈
-  都改為「若 _G.DuelService.isDueling(player) 為 true 就跳過」。原因：
+  MatchManager.lua 新增了 4 處最小、純附加的相容性 guard（非重構）：
+  startMatch 組 participants 清單、teleportToArena、resetToLobby 這三處迴圈，
+  以及 ReloadWeapon RemoteEvent handler 開頭的提前 return，都改為「若
+  _G.DuelService.isDueling(player) 為 true 就跳過」。前三處原因：
   code-review 抓到一個真實的高風險 bug — 若不排除，startMatch 會在
   initPlayerData/teleportToArena 之後、setPhase(PvE) 之前有數秒空窗，此時
   對決雙方會同時擁有 MatchManager.playerData 與 DuelService session，兩套
   FireWeapon/ReloadWeapon 監聽器會各自獨立處理同一次開火/換彈，送出互相衝突
   的 AmmoUpdate/WeaponHit/HealthUpdate 給同一個 client；resetToLobby 也會用
   LoadCharacter 強制重生正在決鬥中的玩家，把他們的角色從決鬥地圖硬拉回大廳。
-  加了這個 guard 後，已配對（Voting/Countdown/Combat 任何階段）的對決會與
-  12 人賽完全隔離、互不影響，不需要在對決端再做任何清理。
+  加了這三處 guard 後，已配對（Voting/Countdown/Combat 任何階段）的對決在
+  傳送/重置層面會與 12 人賽完全隔離。
+  第 4 處（ReloadWeapon）原因不同：即使玩家沒有 playerData、不會被上面三處
+  guard 影響，MatchManager 的 ReloadWeapon handler 仍會在 `not data` 分支
+  呼叫 `syncReloadState` 送出 `ReloadStateChanged(false, 0, nil)`——這與
+  DuelService 自己對同一次換彈送出的 `ReloadStateChanged(true, duration,
+  weapon)` 互相競爭同一個 client 的換彈 UI／R15Pose 姿勢狀態，因此獨立加了
+  提前 return，讓對決中的玩家換彈完全交給 DuelService 處理。
   DuelService 這邊只保留一件事：清空尚未配對的佇列（因為單純排隊中、還沒
   configured session 的玩家不受 MatchManager guard 保護，12 人賽開始時會
   正常把他們一起帶進 Arena，若不清空佇列，稍後配對成功會對一個已經在打
@@ -119,7 +135,7 @@ artifacts:
   - src/ReplicatedStorage/GameConfig.lua  (GameConfig.DUEL 調校值)
   - src/StarterPlayerScripts/DuelVoteUI.lua  (通用地圖投票 UI，不寫死地圖數量)
   - src/ServerScriptService/Tests/DuelMaps.spec.lua  (平票決勝 TestEZ 測試)
-  - src/ServerScriptService/MatchManager.lua  (startMatch/teleportToArena/resetToLobby 新增 isDueling 排除 guard；狀態機本體未變)
+  - src/ServerScriptService/MatchManager.lua  (startMatch/teleportToArena/resetToLobby/ReloadWeapon handler 新增 isDueling 排除 guard；狀態機本體未變)
 
 success_criteria:
   - "現有 12 人 Lobby → PvE → PvP → MatchEnd 狀態機、規則、獎勵完全不變（MatchManager 只多了 3 處 isDueling 排除 guard，非重構）"
