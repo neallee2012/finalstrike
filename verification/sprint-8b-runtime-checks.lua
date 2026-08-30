@@ -3,8 +3,7 @@
 --
 -- Reproducible balance-contract runtime verification.
 -- Originally a Sprint 8b artifact (filename kept for backref stability);
--- now also covers Sprint 9a price realignment. Future sprints either
--- extend this file or split into a sibling.
+-- now also covers the current 16-weapon visual roster.
 --
 -- Usage:
 --   1. Open the Final Strike Studio place file
@@ -23,23 +22,16 @@
 -- This script is read-only — it inspects state but doesn't mutate anything.
 --
 -- Sources of truth checked:
---   - proposals/30-weapon-dps-retune.md §9 (Sprint 8b damage / config)
---   - proposals/demon-shop-price-realignment.md §5 (Sprint 9a prices)
+--   - GameConfig.WEAPON_ORDER (16-weapon roster)
+--   - WeaponVisuals (shared Tool / ViewportFrame models)
 --   - receipts/sprint-8b-200hp-rebalance.md
 --   - receipts/sprint-9a-demon-price-realign.md
 --
--- Static check count = 92 (= 2 base + 6 rarity + 30 weapon damage + 5 sniper
--- type + 6 enemies HP/dmg + 4 loot table + 3 weapon-drop-removed + 6 LOOT
--- entries + 30 weapon prices). Conditional: +6 NPC (PvE only), +1 HUD.
--- Possible totals by context:
---   Lobby (no NPC, HUD ready):     92 + 0 + 1 = 93
---   PvE (NPC + HUD):                92 + 6 + 1 = 99
---   Server-only / no LocalPlayer:   92 (or 98 if NPC present)
-
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
 local GameConfig = require(ReplicatedStorage:WaitForChild("GameConfig"))
+local WeaponVisuals = require(ReplicatedStorage:WaitForChild("WeaponVisuals"))
 
 local pass, fail = 0, 0
 local failures = {}  -- list of {label, expected, actual} for structured return
@@ -61,7 +53,7 @@ end
 -- 1. Player base config
 -- ============================================================
 check("MAX_HP", GameConfig.MAX_HP, 200)
-check("HEADSHOT_MULTIPLIER", GameConfig.HEADSHOT_MULTIPLIER, 2.0)
+check("HEADSHOT_MULTIPLIER", GameConfig.HEADSHOT_MULTIPLIER, 1.25)
 
 -- ============================================================
 -- 2. Rarity DPS multipliers (CEO decision b: gap 3.0x → 1.9x)
@@ -74,67 +66,76 @@ check("RARITY.Legendary.DPS", GameConfig.RARITY.Legendary.DPS, 1.70)
 check("RARITY.Demon.DPS",     GameConfig.RARITY.Demon.DPS,     1.90)
 
 -- ============================================================
--- 3. 30-weapon Damage values (proposals/30-weapon-dps-retune.md §9)
+-- 3. Current 16-weapon config + distinct shared models
 -- ============================================================
 local weaponExpect = {
-	-- Common (5)
-	["Viper Mk1"]=30, ["Viper SD"]=24, ["Fang Scout"]=40,
-	["Thunder Stub"]=14, ["Thunder Cut"]=11,
-	-- Uncommon (5)
-	["Stinger Mk2"]=11, ["Stinger Tac"]=12, ["Phantom Ranger"]=19,
-	["Wraith Scout"]=120, ["Stinger Burst"]=9,
-	-- Rare (5)
-	["Reaver-X"]=20, ["Phantom Night"]=17, ["Thunder Guard"]=12,
-	["Wraith Hunter"]=172, ["Thunder Triple"]=11,
-	-- Epic (6)
-	["Stinger Storm"]=12, ["Phantom Apex"]=21, ["Wraith Frost"]=190,
-	["Phantom Whisper"]=25, ["Thunder Royal"]=13, ["Viper Left"]=62,
-	-- Legendary (5)
-	["Viper Aurum"]=51, ["Phantom Finale"]=24, ["Wraith Apex"]=206,
-	["Thunder Crown"]=14, ["Hailstorm"]=18,
-	-- Demon (4)
-	["Fang Demon"]=76, ["Phantom Hellfire"]=27, ["Wraith Abyss"]=220,
-	["Thunder Bloodmoon"]=14,
+	["Phantom Ranger"]    = { Damage=24,  Head=30,  FireRate=0.10, Price=500,   Style="AssaultRifle",   Slot="Primary" },
+	["Stinger Vector"]    = { Damage=20,  Head=25,  FireRate=0.07, Price=1200,  Style="SMG",            Slot="Primary" },
+	["Thunder Pump"]      = { Damage=13,  Head=16,  FireRate=0.85, Price=700,   Style="PumpShotgun",    Slot="Primary" },
+	["Wraith Longshot"]   = { Damage=120, Head=150, FireRate=1.50, Price=3800,  Style="Sniper",         Slot="Primary" },
+	["Hailstorm LMG"]     = { Damage=22,  Head=28,  FireRate=0.12, Price=18000, Style="LMG",            Slot="Primary" },
+	["Phantom Vanguard"]  = { Damage=36,  Head=45,  FireRate=0.28, Price=3200,  Style="BattleRifle",    Slot="Primary" },
+	["Thunder Tempest"]   = { Damage=10,  Head=13,  FireRate=0.40, Price=8200,  Style="RapidShotgun",   Slot="Primary" },
+	["Wraith Marksman"]   = { Damage=38,  Head=48,  FireRate=0.35, Price=7600,  Style="PrecisionRifle", Slot="Primary" },
+	["Viper Mk1"]         = { Damage=18,  Head=23,  FireRate=0.22, Price=300,   Style="StandardPistol", Slot="Secondary" },
+	["Viper Outlaw"]      = { Damage=30,  Head=38,  FireRate=0.90, Price=1500,  Style="Revolver",       Slot="Secondary" },
+	["Viper Talon"]       = { Damage=25,  Head=31,  FireRate=1.25, Price=2800,  Style="DesertPistol",   Slot="Secondary" },
+	["Thunder Handcannon"]= { Damage=50,  Head=63,  FireRate=2.00, Price=4200,  Style="HeavyPistol",    Slot="Secondary" },
+	["Viper Swift"]       = { Damage=14,  Head=18,  FireRate=0.18, Price=450,   Style="CompactPistol",  Slot="Secondary" },
+	["Viper Trinity"]     = { Damage=15,  Head=19,  FireRate=0.75, Price=7800,  Style="TriplePistol",   Slot="Secondary" },
+	["Stinger Sidearm"]   = { Damage=11,  Head=14,  FireRate=0.06, Price=1800,  Style="MachinePistol",  Slot="Secondary" },
+	["Thunder Twin"]      = { Damage=37,  Head=46,  FireRate=1.20, Price=15000, Style="TwinPistol",     Slot="Secondary" },
 }
-for name, expected in pairs(weaponExpect) do
-	local cfg = GameConfig.WEAPONS[name]
-	check("WEAPONS." .. name .. ".Damage", cfg and cfg.Damage, expected)
-end
 
--- All Sniper variants Type assertion (used by headshot detection)
-for _, name in ipairs({"Wraith Scout", "Wraith Hunter", "Wraith Frost", "Wraith Apex", "Wraith Abyss"}) do
-	check("WEAPONS." .. name .. ".Type", GameConfig.WEAPONS[name].Type, "Sniper")
-end
+local weaponCount = 0
+for _ in pairs(GameConfig.WEAPONS) do weaponCount = weaponCount + 1 end
+check("WEAPONS count", weaponCount, 16)
+check("WEAPON_ORDER count", #GameConfig.WEAPON_ORDER, 16)
 
--- ============================================================
--- 3.5. 30-weapon Price values (Sprint 9 Option A — CEO 2026-05-04)
--- Tier discounts: Common 0% / Uncommon 0% / Rare -5% / Epic -10% / Legendary -20% / Demon -25%
--- See proposals/demon-shop-price-realignment.md.
--- ============================================================
-local priceExpect = {
-	-- Common (5) — 0% (unchanged)
-	["Viper Mk1"]=300, ["Viper SD"]=350, ["Fang Scout"]=450,
-	["Thunder Stub"]=550, ["Thunder Cut"]=650,
-	-- Uncommon (5) — 0% (unchanged)
-	["Stinger Mk2"]=1200, ["Stinger Tac"]=1350, ["Phantom Ranger"]=1500,
-	["Wraith Scout"]=1650, ["Stinger Burst"]=1800,
-	-- Rare (5) — -5%
-	["Reaver-X"]=2850, ["Phantom Night"]=3150, ["Thunder Guard"]=3400,
-	["Wraith Hunter"]=3800, ["Thunder Triple"]=4275,
-	-- Epic (6) — -10%
-	["Stinger Storm"]=6750, ["Phantom Apex"]=7200, ["Wraith Frost"]=7650,
-	["Phantom Whisper"]=8100, ["Thunder Royal"]=8800, ["Viper Left"]=8800,
-	-- Legendary (5) — -20%
-	["Viper Aurum"]=12800, ["Phantom Finale"]=14400, ["Wraith Apex"]=16000,
-	["Thunder Crown"]=17600, ["Hailstorm"]=20000,
-	-- Demon (4) — -25%
-	["Fang Demon"]=26250, ["Phantom Hellfire"]=31500, ["Wraith Abyss"]=36000,
-	["Thunder Bloodmoon"]=41250,
-}
-for name, expected in pairs(priceExpect) do
+local seenStyles = {}
+local slotCounts = { Primary = 0, Secondary = 0 }
+for index, name in ipairs(GameConfig.WEAPON_ORDER) do
+	local expected = weaponExpect[name]
 	local cfg = GameConfig.WEAPONS[name]
-	check("WEAPONS." .. name .. ".Price", cfg and cfg.Price, expected)
+	check(("WEAPON_ORDER[%d] is expected"):format(index), expected ~= nil, true)
+	check("WEAPONS." .. name .. ".Damage", cfg and cfg.Damage, expected and expected.Damage)
+	check("WEAPONS." .. name .. ".HeadDamage", cfg and GameConfig.getHeadshotDamage(cfg), expected and expected.Head)
+	check("WEAPONS." .. name .. ".FireRate", cfg and cfg.FireRate, expected and expected.FireRate)
+	check("WEAPONS." .. name .. ".Price", cfg and cfg.Price, expected and expected.Price)
+	check("WEAPONS." .. name .. ".Style", cfg and cfg.Style, expected and expected.Style)
+	check("WEAPONS." .. name .. ".Slot", cfg and cfg.Slot, expected and expected.Slot)
+	local style = cfg and cfg.Style
+	local slot = cfg and cfg.Slot
+	check("WEAPONS." .. name .. ".Style unique", style and seenStyles[style] or nil, nil)
+	if style then seenStyles[style] = name end
+	if slot then slotCounts[slot] = (slotCounts[slot] or 0) + 1 end
+
+	local model = WeaponVisuals.buildModel(name, cfg)
+	local handle = model and model:FindFirstChild("Handle")
+	local meshCount = 0
+	local basePartCount = 0
+	if model then
+		for _, descendant in ipairs(model:GetDescendants()) do
+			if descendant:IsA("MeshPart") then meshCount = meshCount + 1 end
+			if descendant:IsA("BasePart") then basePartCount = basePartCount + 1 end
+		end
+	end
+	check("WeaponVisuals." .. name .. ".model", model ~= nil, true)
+	check("WeaponVisuals." .. name .. ".Handle", handle and handle:IsA("MeshPart"), true)
+	check("WeaponVisuals." .. name .. ".single MeshPart", meshCount, 1)
+	check("WeaponVisuals." .. name .. ".no extra Parts", basePartCount, 1)
+	check("WeaponVisuals." .. name .. ".Muzzle", handle and handle:FindFirstChild("Muzzle") ~= nil, true)
+	check(
+		"WeaponVisuals." .. name .. ".Muzzle local +Z",
+		handle and handle:FindFirstChild("Muzzle") and handle.Muzzle.Position.Z > 0,
+		true
+	)
+	if model then model:Destroy() end
 end
+check("Primary weapon count", slotCounts.Primary, 8)
+check("Secondary weapon count", slotCounts.Secondary, 8)
+check("Wraith Longshot.Type", GameConfig.WEAPONS["Wraith Longshot"].Type, "Sniper")
+check("Wraith Marksman.Type", GameConfig.WEAPONS["Wraith Marksman"].Type, "Sniper")
 
 -- ============================================================
 -- 4. NPC HP / Damage ×2 + 4-tier loot drop tables

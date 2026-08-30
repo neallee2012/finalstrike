@@ -782,13 +782,12 @@ events:WaitForChild("FireWeapon").OnServerEvent:Connect(function(player, origin,
 			local hitHumanoid = hitChar and hitChar:FindFirstChildOfClass("Humanoid")
 
 			if hitHumanoid then
-				-- Sprint 8b D1: Sniper Type only — hitting Head part applies headshot multiplier.
-				-- Other Types (Pistol/SMG/Rifle/Shotgun/Knife/Minigun) deal flat Damage on Head hit.
-				-- Strict "Head part only" — NPC hat/hood/helmet accessories don't count (deflected).
+				-- Strict Head-part hit: every ranged weapon applies the shared
+				-- rounded headshot rule. NPC accessories do not count.
 				local damage = config.Damage
 				local isHeadshot = hitPart.Name == "Head"
-				if config.Type == "Sniper" and isHeadshot then
-					damage = damage * GameConfig.HEADSHOT_MULTIPLIER
+				if isHeadshot then
+					damage = GameConfig.getHeadshotDamage(config)
 				end
 
 				-- Check if it's a player

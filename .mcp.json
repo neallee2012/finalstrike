@@ -1,8 +1,11 @@
 {
   "mcpServers": {
-    "roblox-studio": {
-      "command": "rbxmcp",
-      "args": []
+    "Roblox_Studio": {
+      "command": "cmd.exe",
+      "args": [
+        "/c",
+        "cd /d %LOCALAPPDATA%\\Roblox && .\\mcp.bat"
+      ]
     }
   }
 }

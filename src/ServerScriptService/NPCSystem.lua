@@ -18,7 +18,7 @@ local events = ReplicatedStorage:WaitForChild("GameEvents")
 -- comes from GameConfig.ENEMIES[type].Damage in the AI loop.
 local NPC_WEAPON = {
 	Patrol  = "Viper Mk1",       -- pistol
-	Armored = "Stinger Mk2",     -- SMG
+	Armored = "Stinger Vector",  -- SMG
 	Elite   = "Phantom Ranger",  -- rifle
 }
 

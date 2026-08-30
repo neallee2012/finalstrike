@@ -17,7 +17,6 @@ local VIEWMODEL_RENDER_STEP = "FinalStrikeViewModelRender"
 local WALL_CHECK_DISTANCE = 2.6
 local FIRST_PERSON_ENTER_DISTANCE = 0.6
 local FIRST_PERSON_EXIT_DISTANCE = 0.75
-local GOLD_COLOR = Color3.fromRGB(212, 175, 55)
 local VIEWMODEL_OFFSETS = {
 	Pistol = CFrame.new(0.65, -0.62, -2)
 		* CFrame.Angles(math.rad(-5), math.rad(8), 0),
@@ -35,6 +34,7 @@ local VIEWMODEL_OFFSETS = {
 		* CFrame.Angles(math.rad(-5), math.rad(8), 0),
 }
 local DEFAULT_VIEWMODEL_OFFSET = VIEWMODEL_OFFSETS.Rifle
+local MESH_FORWARD_ROTATION = CFrame.Angles(0, math.rad(180), 0)
 local RIGHT_HAND_POSE = CFrame.new(0.12, -0.18, 0.08)
 	* CFrame.Angles(math.rad(-90), 0, math.rad(4))
 local LEFT_HAND_POSES = {
@@ -207,10 +207,7 @@ local function buildViewmodel(character, sourceTool)
 	model.Name = VIEWMODEL_NAME
 	model:SetAttribute("SourceWeapon", sourceTool.Name)
 	model:SetAttribute("WeaponType", weaponType)
-	model:SetAttribute(
-		"PresentationName",
-		sourceTool.Name == "Viper Aurum" and "Golden Viper" or sourceTool.Name
-	)
+	model:SetAttribute("PresentationName", sourceTool.Name)
 
 	local root = Instance.new("Part")
 	root.Name = "ViewmodelRoot"
@@ -239,13 +236,6 @@ local function buildViewmodel(character, sourceTool)
 			descendant:Destroy()
 		elseif descendant:IsA("BasePart") and descendant ~= root then
 			preparePart(descendant)
-			if sourceTool.Name == "Viper Aurum"
-				and descendant.Name ~= "Barrel"
-				and descendant.Material ~= Enum.Material.Neon
-			then
-				descendant.Color = GOLD_COLOR
-				descendant.Material = Enum.Material.Metal
-			end
 		end
 	end
 	convertWeaponWeldsToMotors(model)
@@ -263,7 +253,7 @@ local function buildViewmodel(character, sourceTool)
 		"WeaponMotor",
 		root,
 		handle,
-		viewmodelOffset,
+		viewmodelOffset * MESH_FORWARD_ROTATION,
 		CFrame.new(),
 		root
 	)

@@ -24,6 +24,9 @@ local POSE_JOINT_NAMES = {
 	LeftElbow = true,
 	LeftWrist = true,
 }
+local WEAPON_HOLD_POSES = {
+	["Wraith Longshot"] = R15Pose.Poses.WraithLongshotHold,
+}
 local playerStates = {}
 local localReloadActive = false
 
@@ -68,7 +71,8 @@ local function refreshHold(owner, characterState)
 
 	local reloading = owner:GetAttribute(RELOAD_ATTRIBUTE) == true
 		or (owner == player and localReloadActive)
-	if reloading or not findTwoHandedTool(character) then
+	local twoHandedTool = findTwoHandedTool(character)
+	if reloading or not twoHandedTool then
 		stopHold(characterState, false)
 		return
 	end
@@ -101,7 +105,9 @@ local function refreshHold(owner, characterState)
 		characterState.PoseController = controller
 	end
 
-	characterState.PoseController:SetPersistentPose(R15Pose.Poses.TwoHandHold, HOLD_BLEND_TIME)
+	local holdPose = WEAPON_HOLD_POSES[twoHandedTool.Name]
+		or R15Pose.Poses.TwoHandHold
+	characterState.PoseController:SetPersistentPose(holdPose, HOLD_BLEND_TIME)
 end
 
 local function scheduleRefresh(owner, characterState, delaySeconds)

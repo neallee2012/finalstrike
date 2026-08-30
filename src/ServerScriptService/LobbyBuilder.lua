@@ -676,10 +676,10 @@ local function buildBays(lobby)
 
 	local shopBay = buildBayFrame(left, -1, 45, "WeaponShopBay", "WEAPON SHOP")
 	addWeaponWall(shopBay, -1, 45, {
-		"Stinger Mk2",
-		"Phantom Apex",
-		"Thunder Guard",
-		"Wraith Scout",
+		"Stinger Vector",
+		"Phantom Vanguard",
+		"Thunder Pump",
+		"Wraith Longshot",
 	})
 	addShopTerminal(shopBay, -1, 45)
 
@@ -688,10 +688,10 @@ local function buildBays(lobby)
 
 	local armoryBay = buildBayFrame(right, 1, 0, "ArmoryBay", "ARMORY")
 	addWeaponWall(armoryBay, 1, 0, {
-		"Viper Aurum",
-		"Phantom Finale",
-		"Thunder Crown",
-		"Wraith Abyss",
+		"Viper Outlaw",
+		"Thunder Handcannon",
+		"Hailstorm LMG",
+		"Thunder Twin",
 	})
 
 	local leaderboardBay = buildBayFrame(right, 1, -45, "LeaderboardsBay", "LEADERBOARDS")

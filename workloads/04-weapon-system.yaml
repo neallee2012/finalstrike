@@ -4,6 +4,24 @@ priority: P0-prototype
 status: "✅ IMPLEMENTED (#47 full-place E2E passed in 最後一擊 on 2026-07-12; awaiting PR)"
 sprint_8b_receipt: receipts/sprint-8b-200hp-rebalance.md
 
+current_roster:
+  updated: 2026-08-23
+  count: 16
+  categories: { Primary: 8, Secondary: 8 }
+  source: "核准武器參考圖"
+  balance_source: "現行 FireRate / Damage 以 16 武器參考圖為準，取代歷史 rarity DPS 公式"
+  model_contract: |
+    每把武器以單一、連續 MeshPart 作為完整外殼，禁止用大量方塊 Part
+    拼裝或留下可見縫隙。ReplicatedStorage.WeaponMeshAssets 保存正式網格，
+    WeaponVisuals 同時供 Tool 與 ViewportFrame clone，確保實際裝備和縮圖一致。
+    網格原生槍口朝 local +Z；Tool Grip 與第一人稱 ViewModel 統一旋轉 Y=180°，
+    Muzzle Attachment 保持在 local +Z 端，確保實際世界方向朝前。
+  gameplay_contract: |
+    每把武器保留 Type / Damage / FireRate / MagSize / ReloadTime / Range /
+    Spread / Auto 等 server-authoritative 欄位，可購買、裝備、射擊與換彈。
+    所有武器爆頭傷害由 GameConfig.getHeadshotDamage 計算：
+    身體傷害 × 1.25 後四捨五入；多彈丸武器逐顆套用。
+
 # ============= Sprint 8b 計劃中的修改（CEO 決議 b 後重寫 2026-05-03） =============
 # 詳見 proposals/sprint-8-200hp-balance.md §3.5 + §4.2
 #
@@ -147,8 +165,9 @@ stages:
   - verify: "最後一擊 E2E: StartMatchPad 完整 phase lifecycle；manual 8/60→12/56；auto 1/12→12/0；partial 2/3→5/0；AmmoPickup 12/0→12/15"
   - verify: "最後一擊 E2E: reload 中 respawn / elimination 均保留 8/60、清除 Reloading；respawn 重新掛槍，淘汰後無槍"
 success_criteria:
-  - 30 把武器可購買、裝備與射擊
-  - Common→Demon DPS 倍率收斂為 1.0/1.15/1.30/1.50/1.70/1.90
+  - 16 把武器可購買、裝備與射擊
+  - 16 把武器各自恰好一個 MeshPart，且 Tool 與選單縮圖來自同一 WeaponVisuals 模型
+  - 所有武器卡片顯示射擊間隔、身體傷害、爆頭傷害，且數值與 server 計算一致
   - 全自動/半自動模式正確
   - 手動/空彈自動換彈依每把武器 ReloadTime，從 reserve 補彈並在期間由 server 拒絕射擊
   - reserve 不足時只補剩餘子彈；Ammo pickup 增加 reserve 而不取消進行中的 reload

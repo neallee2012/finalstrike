@@ -1,6 +1,6 @@
 -- TrainingArenaUI.lua (StarterPlayerScripts)
 -- Weapon picker shown when the player teleports into the TrainingArena.
--- Lists ALL 30 weapons (no ownership filter — training mode is for testing
+-- Lists all 16 weapons (no ownership filter — training mode is for testing
 -- guns the player hasn't bought yet). Click a card → fires
 -- SelectTrainingWeapon to the server, which equips the weapon and resets
 -- ammo. UI auto-closes on selection so the player can immediately shoot.
@@ -19,24 +19,27 @@ local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local GameConfig = require(ReplicatedStorage:WaitForChild("GameConfig"))
+local WeaponVisuals = require(ReplicatedStorage:WaitForChild("WeaponVisuals"))
 local events = ReplicatedStorage:WaitForChild("GameEvents")
 
--- Sorted list (rarity order, then price) — same logic as ShopController so
--- training picker visually matches the shop.
+-- Same stable reference-sheet order as ShopController.
 local function buildWeaponList()
 	local list = {}
-	for name, cfg in pairs(GameConfig.WEAPONS) do
+	for _, name in ipairs(GameConfig.WEAPON_ORDER) do
+		local cfg = GameConfig.WEAPONS[name]
 		table.insert(list, { Name = name, Config = cfg })
 	end
-	table.sort(list, function(a, b)
-		local ra = GameConfig.RARITY[a.Config.Rarity]
-		local rb = GameConfig.RARITY[b.Config.Rarity]
-		if ra.Order ~= rb.Order then return ra.Order < rb.Order end
-		return (a.Config.Price or 0) < (b.Config.Price or 0)
-	end)
 	return list
 end
 local weaponList = buildWeaponList()
+
+local function damageText(config, headshot)
+	local damage = headshot and GameConfig.getHeadshotDamage(config) or config.Damage
+	if config.Pellets then
+		return string.format("%d x %d", damage, config.Pellets)
+	end
+	return tostring(damage)
+end
 
 -- ==================== UI ====================
 local screenGui = Instance.new("ScreenGui")
@@ -79,7 +82,7 @@ local hint = Instance.new("TextLabel")
 hint.Size = UDim2.new(0.3, -70, 0.7, 0)
 hint.Position = UDim2.new(0.65, 10, 0.15, 0)
 hint.BackgroundTransparency = 1
-hint.Text = "All 30 weapons free in training"
+hint.Text = "All 16 weapons free in training"
 hint.TextColor3 = Color3.fromRGB(180, 180, 180)
 hint.TextScaled = true
 hint.Font = Enum.Font.GothamMedium
@@ -110,7 +113,7 @@ tabLayout.Padding = UDim.new(0, 4)
 tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
 tabLayout.Parent = tabBar
 
-local TABS = { "All", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Demon" }
+local TABS = { "All", "Primary", "Secondary", "Common", "Uncommon", "Rare", "Epic", "Legendary" }
 local currentTab = "All"
 local tabButtons = {}
 
@@ -126,7 +129,7 @@ scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 scroll.Parent = main
 local sc = Instance.new("UICorner") sc.CornerRadius = UDim.new(0, 6) sc.Parent = scroll
 local gridLayout = Instance.new("UIGridLayout")
-gridLayout.CellSize = UDim2.new(0, 200, 0, 100)
+gridLayout.CellSize = UDim2.new(0, 220, 0, 240)
 gridLayout.CellPadding = UDim2.new(0, 10, 0, 10)
 gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
 gridLayout.Parent = scroll
@@ -165,6 +168,20 @@ local function makeCard(weapon)
 	strip.BorderSizePixel = 0
 	strip.Parent = card
 
+	local viewport = Instance.new("ViewportFrame")
+	viewport.Name = "WeaponThumbnail"
+	viewport.Size = UDim2.new(1, -12, 0, 92)
+	viewport.Position = UDim2.new(0, 6, 0, 7)
+	viewport.BackgroundColor3 = Color3.fromRGB(11, 13, 17)
+	viewport.BackgroundTransparency = 0.1
+	viewport.BorderSizePixel = 0
+	viewport.Ambient = Color3.fromRGB(170, 175, 185)
+	viewport.LightColor = Color3.fromRGB(255, 248, 235)
+	viewport.LightDirection = Vector3.new(-1, -0.5, -1)
+	viewport.Parent = card
+	local vc = Instance.new("UICorner") vc.CornerRadius = UDim.new(0, 4) vc.Parent = viewport
+	WeaponVisuals.createViewport(viewport, weapon.Name, weapon.Config)
+
 	-- Each card is itself a button (whole-card click to select). No separate
 	-- BUY/EQUIP buttons — training picker is "click and go".
 	local btn = Instance.new("TextButton")
@@ -176,7 +193,7 @@ local function makeCard(weapon)
 
 	local nameLbl = Instance.new("TextLabel")
 	nameLbl.Size = UDim2.new(1, -10, 0, 28)
-	nameLbl.Position = UDim2.new(0, 5, 0, 12)
+	nameLbl.Position = UDim2.new(0, 5, 0, 102)
 	nameLbl.BackgroundTransparency = 1
 	nameLbl.Text = weapon.Name
 	nameLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -186,25 +203,30 @@ local function makeCard(weapon)
 
 	local subLbl = Instance.new("TextLabel")
 	subLbl.Size = UDim2.new(1, -10, 0, 18)
-	subLbl.Position = UDim2.new(0, 5, 0, 44)
+	subLbl.Position = UDim2.new(0, 5, 0, 132)
 	subLbl.BackgroundTransparency = 1
-	subLbl.Text = string.format("%s · %s", weapon.Config.Rarity, weapon.Config.Type)
+	subLbl.Text = string.format("%s · %s · %s", weapon.Config.Slot, weapon.Config.Rarity, weapon.Config.Type)
 	subLbl.TextColor3 = rarityCfg.Color
 	subLbl.TextScaled = true
 	subLbl.Font = Enum.Font.GothamMedium
 	subLbl.Parent = card
 
-	-- Stats row: damage + fire rate (or attack rate for knives)
-	local rate = weapon.Config.FireRate or weapon.Config.AttackRate
-	local stats = Instance.new("TextLabel")
-	stats.Size = UDim2.new(1, -10, 0, 18)
-	stats.Position = UDim2.new(0, 5, 0, 66)
-	stats.BackgroundTransparency = 1
-	stats.Text = string.format("DMG %d  ·  %.2fs", weapon.Config.Damage, rate or 0)
-	stats.TextColor3 = Color3.fromRGB(220, 220, 220)
-	stats.TextScaled = true
-	stats.Font = Enum.Font.GothamMedium
-	stats.Parent = card
+	local function addStat(text, y, color)
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.new(1, -10, 0, 18)
+		label.Position = UDim2.new(0, 5, 0, y)
+		label.BackgroundTransparency = 1
+		label.Text = text
+		label.TextColor3 = color
+		label.TextScaled = true
+		label.Font = Enum.Font.GothamMedium
+		label.TextXAlignment = Enum.TextXAlignment.Left
+		label.Parent = card
+	end
+
+	addStat(string.format("FIRE INTERVAL  %.2fs", weapon.Config.FireRate), 156, Color3.fromRGB(210, 210, 215))
+	addStat("BODY DAMAGE  " .. damageText(weapon.Config, false), 177, Color3.fromRGB(225, 225, 225))
+	addStat("HEAD DAMAGE  " .. damageText(weapon.Config, true), 198, Color3.fromRGB(255, 90, 75))
 
 	btn.MouseButton1Click:Connect(function()
 		events.SelectTrainingWeapon:FireServer(weapon.Name)
@@ -220,7 +242,11 @@ local function applyTabFilter()
 	for _, weapon in ipairs(weaponList) do
 		local entry = cards[weapon.Name]
 		if entry then
-			entry.Frame.Visible = (currentTab == "All" or weapon.Config.Rarity == currentTab)
+			entry.Frame.Visible = (
+				currentTab == "All"
+					or weapon.Config.Slot == currentTab
+					or weapon.Config.Rarity == currentTab
+			)
 		end
 	end
 end
@@ -238,7 +264,8 @@ for i, tabName in ipairs(TABS) do
 	btn.Size = UDim2.new(0, 100, 1, 0)
 	btn.Text = tabName
 	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-	btn.TextScaled = true
+	btn.TextScaled = false
+	btn.TextSize = 18
 	btn.Font = Enum.Font.GothamBold
 	btn.BackgroundColor3 = (tabName == currentTab) and Color3.fromRGB(60, 60, 80) or Color3.fromRGB(30, 30, 40)
 	btn.LayoutOrder = i

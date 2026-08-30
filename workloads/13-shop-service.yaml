@@ -9,9 +9,11 @@ backfill_note: |
 
 # ============= 系統定位 =============
 purpose: |
-  30 武器商店 + 持久化武器擁有狀態 + 主武器選擇。
+  16 武器商店 + 持久化武器擁有狀態 + 主武器選擇。
   玩家用 CurrencyService.spend 花 coins 買武器，買到的武器跨 session 保留，
   比賽開始時 server 把 primary weapon attach 到 character。
+  商店與訓練選單使用 WeaponVisuals 產生 3D ViewportFrame 縮圖，
+  確保縮圖、第一人稱、第三人稱與實際裝備是同一模型。
 
 # ============= 規格 =============
 data_stores:
@@ -26,7 +28,7 @@ data_stores:
     rationale: "存獨立 key — 萬一 primary 損毀不會丟失整批 ownership"
 
 starter_weapons_source: GameConfig.STARTER_WEAPONS
-starter_weapons_default: ["Viper Mk1", "Fang Scout"]
+starter_weapons_default: ["Phantom Ranger", "Viper Mk1"]
 starter_weapons_behavior: |
   Loaded 時自動授予（不存進 DataStore）— 之後若 GameConfig.STARTER_WEAPONS
   增加新項目，老玩家也自動拿到。
@@ -62,14 +64,17 @@ persistence_strategy:
 
 artifacts:
   - src/ServerScriptService/ShopService.lua  (199 行)
-  - src/StarterPlayerScripts/ShopController.lua  (362 行 — UI + buy/equip flow)
-  - src/ReplicatedStorage/GameConfig.lua  (WEAPONS 30 把 + RARITY + STARTER_WEAPONS)
+  - src/StarterPlayerScripts/ShopController.lua  (UI + 3D 縮圖 + buy/equip flow)
+  - src/ReplicatedStorage/GameConfig.lua  (WEAPONS 16 把 + WEAPON_ORDER + RARITY + STARTER_WEAPONS)
+  - src/ReplicatedStorage/WeaponVisuals.lua  (16 個單體 MeshPart 資產 + ViewportFrame)
   - src/ServerScriptService/GameEventsBootstrap.lua  (Buy* + Equip* + GetOwnedWeapons + GetPrimaryWeapon events)
   - src/ServerScriptService/MatchManager.lua  (startMatch 用 ShopService.getPrimary)
 
 success_criteria:
-  - "30 把武器全部可在 ShopController UI 中看到，含 Price / Rarity / DPS"
-  - "starter weapons (Viper Mk1, Fang Scout) 新玩家初始就擁有"
+  - "16 把武器全部可在 ShopController UI 中看到，含 3D 縮圖 / Slot / Price / Rarity / Type"
+  - "每張卡片顯示射擊間隔 / 身體傷害 / 爆頭傷害，多彈丸武器顯示單顆傷害 × 顆數"
+  - "8 把 Primary + 8 把 Secondary，順序與核准參考圖一致"
+  - "starter weapons (Phantom Ranger, Viper Mk1) 新玩家初始就擁有"
   - "tryBuy 成功時扣 coins + 加入 owned set + push update"
   - "已擁有的武器 tryBuy 回 'owned' 不重複扣費"
   - "餘額不足時 tryBuy 回 'broke' 不扣不解鎖"
@@ -90,3 +95,4 @@ dependencies:
   downstream:
     - MatchManager (getPrimary on startMatch)
     - WeaponMeshes (build weapon Tool by name)
+    - WeaponVisuals (shared Tool / thumbnail model)

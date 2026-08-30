@@ -1,5 +1,9 @@
 # Sprint 8b Manual Playtest Checklist — 5 Deferred Integration Tests
 
+> **SUPERSEDED WEAPON DATA:** 本文件保留 Sprint 8b 歷史驗證紀錄，其中舊 30 把武器名稱與
+> Sniper-only 2.0x 爆頭規則已不適用。現行 16 把武器請執行
+> `verification/sprint-8b-runtime-checks.lua`，並以商店卡片的射擊間隔／身體傷害／爆頭傷害為準。
+
 Date: 2026-05-04
 Purpose: Close the 5 integration tests that `verification/sprint-8b-runtime-checks.lua` could not auto-verify (執行 luau 在 client context 跑不了 server-side state mutation；參見 `receipts/sprint-8b-studio-verify.md` §"Deferred"). 一次 human playtest，~10 分鐘。
 

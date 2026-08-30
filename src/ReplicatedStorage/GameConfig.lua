@@ -21,9 +21,14 @@ GameConfig.MEDKIT_HEAL = 100  -- legacy fallback; new code reads GameConfig.LOOT
 GameConfig.STARTING_RESERVE_MAGAZINES = 5
 GameConfig.MAX_RESERVE_MAGAZINES = 15
 
--- Headshot multiplier — Sprint 8b only Sniper Type applies (D1 decision)
--- See proposals/sprint-8-200hp-balance.md §3.5 for full rationale.
-GameConfig.HEADSHOT_MULTIPLIER = 2.0
+-- All ranged weapons use the reference-sheet headshot rule. Per-pellet weapons
+-- apply this rounded value to every pellet that hits the Head.
+GameConfig.HEADSHOT_MULTIPLIER = 1.25
+
+function GameConfig.getHeadshotDamage(config)
+	if not config or type(config.Damage) ~= "number" then return 0 end
+	return math.floor(config.Damage * GameConfig.HEADSHOT_MULTIPLIER + 0.5)
+end
 
 -- Match phases
 GameConfig.PHASE = {
@@ -46,59 +51,49 @@ GameConfig.RARITY = {
 	Demon     = { Order = 6, DPS = 1.90, Color = Color3.fromRGB(220,  40,  40) },  -- was 3.00
 }
 
--- Weapon definitions (fictional names only — no real-world brands)
--- Balance: Sprint 8b (b) retune — Damage tuned so each weapon's DPS matches the
--- new rarity multiplier (1.0 / 1.15 / 1.30 / 1.50 / 1.70 / 1.90) over Common baseline.
--- Type baselines: Pistol 75 / SMG 110 / Rifle 110 / Shotgun 99 / Sniper 110 / Knife 80.
--- Hailstorm Minigun: option B (Damage 18 unchanged, SpinUp is the trade-off).
--- See proposals/30-weapon-dps-retune.md for full table + per-weapon TTK.
---
--- Sprint 9 (Option A) — shop price realignment per CEO 2026-05-04 decision:
--- tier-graduated discount aligning coin cost with post-(b) DPS reality.
---   Common 0% / Uncommon 0% / Rare -5% / Epic -10% / Legendary -20% / Demon -25%
--- See proposals/demon-shop-price-realignment.md.
+-- Sixteen fictional weapons matching the approved 8-primary / 8-secondary
+-- visual roster. Style selects a distinct WeaponVisuals builder; Type remains
+-- the gameplay contract used by firing, reload, recoil, and headshot systems.
 GameConfig.WEAPONS = {
-	-- ===== Common (5) — 1.00x DPS =====
-	["Viper Mk1"]      = { Type="Pistol",  Rarity="Common",    Price=  300, Damage= 30, FireRate=0.40, MagSize=12, ReloadTime=1.5, Range=200, Spread=0.020, Auto=false },  -- was 25
-	["Viper SD"]       = { Type="Pistol",  Rarity="Common",    Price=  350, Damage= 24, FireRate=0.32, MagSize=15, ReloadTime=1.6, Range=180, Spread=0.022, Auto=false },  -- was 22
-	["Fang Scout"]     = { Type="Knife",   Rarity="Common",    Price=  450, Damage= 40, AttackRate=0.50, Range=8 },                                                          -- unchanged
-	["Thunder Stub"]   = { Type="Shotgun", Rarity="Common",    Price=  550, Damage= 14, Pellets=6, FireRate=0.85, MagSize=4, ReloadTime=2.8, Range=40, Spread=0.12, Auto=false },  -- was 12
-	["Thunder Cut"]    = { Type="Shotgun", Rarity="Common",    Price=  650, Damage= 11, Pellets=8, FireRate=0.90, MagSize=5, ReloadTime=3.0, Range=45, Spread=0.11, Auto=false },  -- unchanged
+	-- Primary weapons
+	["Phantom Ranger"]   = { Style="AssaultRifle",   Slot="Primary",   Type="Rifle",   Rarity="Common",    Price=  500, Damage=24, FireRate=0.10, MagSize=30, ReloadTime=2.4, Range=310, Spread=0.018, Auto=true },
+	["Stinger Vector"]   = { Style="SMG",            Slot="Primary",   Type="SMG",     Rarity="Uncommon",  Price= 1200, Damage=20, FireRate=0.07, MagSize=32, ReloadTime=2.0, Range=160, Spread=0.038, Auto=true },
+	["Thunder Pump"]     = { Style="PumpShotgun",    Slot="Primary",   Type="Shotgun", Rarity="Common",    Price=  700, Damage=13, Pellets=8, FireRate=0.85, MagSize=5,  ReloadTime=3.0, Range=48,  Spread=0.11,  Auto=false },
+	["Wraith Longshot"]  = { Style="Sniper",         Slot="Primary",   Type="Sniper",  Rarity="Rare",      Price= 3800, Damage=120,FireRate=1.50, MagSize=6,  ReloadTime=3.2, Range=500, Spread=0.006, Auto=false },
+	["Hailstorm LMG"]    = { Style="LMG",            Slot="Primary",   Type="Minigun", Rarity="Legendary", Price=18000, Damage=22, FireRate=0.12, MagSize=100,ReloadTime=4.2, Range=230, Spread=0.05,  Auto=true, SpinUp=0.4 },
+	["Phantom Vanguard"] = { Style="BattleRifle",    Slot="Primary",   Type="Rifle",   Rarity="Rare",      Price= 3200, Damage=36, FireRate=0.28, MagSize=24, ReloadTime=2.6, Range=360, Spread=0.014, Auto=true },
+	["Thunder Tempest"]  = { Style="RapidShotgun",   Slot="Primary",   Type="Shotgun", Rarity="Epic",      Price= 8200, Damage=10, Pellets=8, FireRate=0.40, MagSize=8,  ReloadTime=2.8, Range=55,  Spread=0.095, Auto=true },
+	["Wraith Marksman"]  = { Style="PrecisionRifle", Slot="Primary",   Type="Sniper",  Rarity="Epic",      Price= 7600, Damage=38, FireRate=0.35, MagSize=10, ReloadTime=2.8, Range=440, Spread=0.005, Auto=false },
 
-	-- ===== Uncommon (5) — 1.15x DPS =====
-	["Stinger Mk2"]    = { Type="SMG",     Rarity="Uncommon",  Price= 1200, Damage= 11, FireRate=0.085, MagSize=30, ReloadTime=2.0, Range=150, Spread=0.040, Auto=true },  -- was 16
-	["Stinger Tac"]    = { Type="SMG",     Rarity="Uncommon",  Price= 1350, Damage= 12, FireRate=0.095, MagSize=28, ReloadTime=2.0, Range=160, Spread=0.038, Auto=true },  -- was 18
-	["Phantom Ranger"] = { Type="Rifle",   Rarity="Uncommon",  Price= 1500, Damage= 19, FireRate=0.15,  MagSize=25, ReloadTime=2.5, Range=300, Spread=0.018, Auto=true },  -- was 35
-	["Wraith Scout"]   = { Type="Sniper",  Rarity="Uncommon",  Price= 1650, Damage=120, FireRate=0.95,  MagSize=8,  ReloadTime=3.0, Range=400, Spread=0.008, Auto=false }, -- was 70
-	["Stinger Burst"]  = { Type="SMG",     Rarity="Uncommon",  Price= 1800, Damage=  9, FireRate=0.07,  MagSize=32, ReloadTime=2.0, Range=140, Spread=0.045, Auto=true },  -- was 14
+	-- Secondary weapons
+	["Viper Mk1"]        = { Style="StandardPistol", Slot="Secondary", Type="Pistol",  Rarity="Common",    Price=  300, Damage=18, FireRate=0.22, MagSize=12, ReloadTime=1.5, Range=200, Spread=0.020, Auto=false },
+	["Viper Outlaw"]     = { Style="Revolver",       Slot="Secondary", Type="Pistol",  Rarity="Uncommon",  Price= 1500, Damage=30, FireRate=0.90, MagSize=6,  ReloadTime=2.2, Range=230, Spread=0.018, Auto=false },
+	["Viper Talon"]      = { Style="DesertPistol",   Slot="Secondary", Type="Pistol",  Rarity="Rare",      Price= 2800, Damage=25, FireRate=1.25, MagSize=8,  ReloadTime=2.0, Range=245, Spread=0.017, Auto=false },
+	["Thunder Handcannon"]= {Style="HeavyPistol",    Slot="Secondary", Type="Pistol",  Rarity="Rare",      Price= 4200, Damage=50, FireRate=2.00, MagSize=7,  ReloadTime=2.4, Range=270, Spread=0.016, Auto=false },
+	["Viper Swift"]      = { Style="CompactPistol",  Slot="Secondary", Type="Pistol",  Rarity="Common",    Price=  450, Damage=14, FireRate=0.18, MagSize=14, ReloadTime=1.4, Range=165, Spread=0.028, Auto=false },
+	["Viper Trinity"]    = { Style="TriplePistol",   Slot="Secondary", Type="Pistol",  Rarity="Epic",      Price= 7800, Damage=15, Pellets=3, FireRate=0.75, MagSize=9,  ReloadTime=2.3, Range=210, Spread=0.025, Auto=false },
+	["Stinger Sidearm"]  = { Style="MachinePistol",  Slot="Secondary", Type="SMG",     Rarity="Uncommon",  Price= 1800, Damage=11, FireRate=0.06, MagSize=24, ReloadTime=2.0, Range=125, Spread=0.05,  Auto=true },
+	["Thunder Twin"]     = { Style="TwinPistol",     Slot="Secondary", Type="Pistol",  Rarity="Legendary", Price=15000, Damage=37, Pellets=2, FireRate=1.20, MagSize=8,  ReloadTime=2.5, Range=235, Spread=0.022, Auto=false },
+}
 
-	-- ===== Rare (5) — 1.30x DPS =====
-	["Reaver-X"]       = { Type="Rifle",   Rarity="Rare",      Price= 2850, Damage= 20, FireRate=0.14,  MagSize=30, ReloadTime=2.4, Range=320, Spread=0.020, Auto=true },  -- price was 3000 (-5%)
-	["Phantom Night"]  = { Type="Rifle",   Rarity="Rare",      Price= 3150, Damage= 17, FireRate=0.12,  MagSize=30, ReloadTime=2.3, Range=320, Spread=0.014, Auto=true },  -- price was 3300 (-5% rounded)
-	["Thunder Guard"]  = { Type="Shotgun", Rarity="Rare",      Price= 3400, Damage= 12, Pellets=8, FireRate=0.75, MagSize=6, ReloadTime=2.7, Range=55, Spread=0.10, Auto=false },  -- price was 3600 (-5% rounded)
-	["Wraith Hunter"]  = { Type="Sniper",  Rarity="Rare",      Price= 3800, Damage=172, FireRate=1.20,  MagSize=6,  ReloadTime=3.2, Range=480, Spread=0.006, Auto=false }, -- price was 4000 (-5%)
-	["Thunder Triple"] = { Type="Shotgun", Rarity="Rare",      Price= 4275, Damage= 11, Pellets=9, FireRate=0.80, MagSize=3, ReloadTime=3.5, Range=50, Spread=0.13, Auto=false },  -- price was 4500 (-5%)
-
-	-- ===== Epic (6) — 1.50x DPS =====
-	["Stinger Storm"]  = { Type="SMG",     Rarity="Epic",      Price= 6750, Damage= 12, FireRate=0.075, MagSize=35, ReloadTime=1.9, Range=170, Spread=0.035, Auto=true },  -- price was 7500 (-10%)
-	["Phantom Apex"]   = { Type="Rifle",   Rarity="Epic",      Price= 7200, Damage= 21, FireRate=0.13,  MagSize=30, ReloadTime=2.2, Range=340, Spread=0.013, Auto=true },  -- price was 8000 (-10%)
-	["Wraith Frost"]   = { Type="Sniper",  Rarity="Epic",      Price= 7650, Damage=190, FireRate=1.15,  MagSize=6,  ReloadTime=3.0, Range=520, Spread=0.005, Auto=false }, -- price was 8500 (-10%)
-	["Phantom Whisper"]= { Type="Rifle",   Rarity="Epic",      Price= 8100, Damage= 25, FireRate=0.15,  MagSize=24, ReloadTime=2.4, Range=360, Spread=0.011, Auto=true, Silent=true },  -- price was 9000 (-10%) (Silent unchanged)
-	["Thunder Royal"]  = { Type="Shotgun", Rarity="Epic",      Price= 8800, Damage= 13, Pellets=8, FireRate=0.70, MagSize=6, ReloadTime=2.6, Range=60, Spread=0.09, Auto=false },  -- price was 9800 (-10% rounded)
-	["Viper Left"]     = { Type="Pistol",  Rarity="Epic",      Price= 8800, Damage= 62, FireRate=0.55,  MagSize=6,  ReloadTime=1.8, Range=240, Spread=0.018, Auto=false },  -- price was 9800 (-10% rounded)
-
-	-- ===== Legendary (5) — 1.70x DPS =====
-	["Viper Aurum"]    = { Type="Pistol",  Rarity="Legendary", Price=12800, Damage= 51, FireRate=0.40,  MagSize=12, ReloadTime=1.4, Range=260, Spread=0.015, Auto=false },  -- price was 16000 (-20%)
-	["Phantom Finale"] = { Type="Rifle",   Rarity="Legendary", Price=14400, Damage= 24, FireRate=0.13,  MagSize=30, ReloadTime=2.1, Range=360, Spread=0.012, Auto=true },  -- price was 18000 (-20%)
-	["Wraith Apex"]    = { Type="Sniper",  Rarity="Legendary", Price=16000, Damage=206, FireRate=1.10,  MagSize=6,  ReloadTime=2.9, Range=560, Spread=0.004, Auto=false }, -- price was 20000 (-20%)
-	["Thunder Crown"]  = { Type="Shotgun", Rarity="Legendary", Price=17600, Damage= 14, Pellets=8, FireRate=0.65, MagSize=6, ReloadTime=2.5, Range=65, Spread=0.085, Auto=false },  -- price was 22000 (-20%)
-	["Hailstorm"]      = { Type="Minigun", Rarity="Legendary", Price=20000, Damage= 18, FireRate=0.05,  MagSize=120,ReloadTime=4.5, Range=220, Spread=0.055, Auto=true, SpinUp=0.5 },  -- price was 25000 (-20%) (Damage unchanged option B)
-
-	-- ===== Demon (4) — 1.90x DPS =====
-	["Fang Demon"]     = { Type="Knife",   Rarity="Demon",     Price=26250, Damage= 76, AttackRate=0.50, Range=10 },  -- price was 35000 (-25%)
-	["Phantom Hellfire"]= {Type="Rifle",   Rarity="Demon",     Price=31500, Damage= 27, FireRate=0.13,  MagSize=30, ReloadTime=2.0, Range=380, Spread=0.012, Auto=true, Burn=true },  -- price was 42000 (-25%) (Burn unchanged)
-	["Wraith Abyss"]   = { Type="Sniper",  Rarity="Demon",     Price=36000, Damage=220, FireRate=1.05,  MagSize=5,  ReloadTime=2.8, Range=600, Spread=0.003, Auto=false, Pierce=true },  -- price was 48000 (-25%) (Pierce unchanged)
-	["Thunder Bloodmoon"]={Type="Shotgun", Rarity="Demon",     Price=41250, Damage= 14, Pellets=8, FireRate=0.60, MagSize=6, ReloadTime=2.3, Range=70, Spread=0.080, Auto=false },  -- price was 55000 (-25%)
+-- Stable visual order matching the approved reference sheet.
+GameConfig.WEAPON_ORDER = {
+	"Phantom Ranger",
+	"Stinger Vector",
+	"Thunder Pump",
+	"Wraith Longshot",
+	"Hailstorm LMG",
+	"Phantom Vanguard",
+	"Thunder Tempest",
+	"Wraith Marksman",
+	"Viper Mk1",
+	"Viper Outlaw",
+	"Viper Talon",
+	"Thunder Handcannon",
+	"Viper Swift",
+	"Viper Trinity",
+	"Stinger Sidearm",
+	"Thunder Twin",
 }
 
 -- Published R15 reload animations by matching weapon type. WeaponClient scales
@@ -109,8 +104,8 @@ GameConfig.RELOAD_ANIMATION_IDS = {
 	Shotgun = 70858423637669,
 }
 
--- Default starter weapons — every player owns these from the start, no purchase needed
-GameConfig.STARTER_WEAPONS = { "Viper Mk1", "Fang Scout" }
+-- One starter per visual category; the shop still chooses a single active weapon.
+GameConfig.STARTER_WEAPONS = { "Phantom Ranger", "Viper Mk1" }
 
 -- Economy: per-action rewards + per-match caps (anti-farming)
 GameConfig.ECONOMY = {

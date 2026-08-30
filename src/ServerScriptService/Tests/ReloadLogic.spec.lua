@@ -126,7 +126,7 @@ return function()
 
 			local changedData = freshData(12)
 			local changedOperation = ReloadLogic.start(changedData, rifle, 100)
-			changedData.Weapon = "Wraith Scout"
+			changedData.Weapon = "Wraith Longshot"
 			expect(ReloadLogic.complete(changedData, changedOperation, rifle)).to.equal(false)
 		end)
 	end)

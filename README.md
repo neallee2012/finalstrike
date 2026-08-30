@@ -22,10 +22,10 @@ A 12-player survival shooter for Roblox. PvE loot phase → PvP elimination.
 - **MapBuilder.lua / LobbyBuilder.lua** - Procedural Last Zone orchestration and the six-bay industrial bunker lobby
 - **NPCSystem.lua** - R15 NPC spawning, AI, combat, training dummies, and loot drops
 - **LootSystem.lua** - Ammo, medkit, and coin pickups
-- **CurrencyService.lua / ShopService.lua** - BulletCoin persistence and 30-weapon ownership/loadout
+- **CurrencyService.lua / ShopService.lua** - BulletCoin persistence and 16-weapon ownership/loadout
 - **DailyQuestService.lua** - UTC-reset daily quest progress and rewards
 - **TrainingService.lua** - Training arena entry, exit, and unrestricted weapon selection
-- **WeaponMeshes.lua** - Tool-based weapon model builders and grip setup
+- **WeaponVisuals.lua / WeaponMeshes.lua** - Shared single-MeshPart weapon assets, thumbnails, and Tool grip setup
 - **HUDController.lua / WeaponClient.lua** - HUD, firing input, reload input, and local weapon FX
 - **ViewmodelController.lua / CameraController.lua** - First-person arms, crosshair, and camera behavior
 - **ShopController.lua / DailyQuestUI.lua / TrainingArenaUI.lua** - Interactive client UI

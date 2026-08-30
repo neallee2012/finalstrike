@@ -9,25 +9,29 @@ local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local GameConfig = require(ReplicatedStorage:WaitForChild("GameConfig"))
+local WeaponVisuals = require(ReplicatedStorage:WaitForChild("WeaponVisuals"))
 local events = ReplicatedStorage:WaitForChild("GameEvents")
 
--- Sort weapons by rarity order, then price (mirrors the CEO mockup layout)
+-- Stable order mirrors the approved 8-primary / 8-secondary reference sheet.
 local function buildWeaponList()
 	local list = {}
-	for name, cfg in pairs(GameConfig.WEAPONS) do
+	for _, name in ipairs(GameConfig.WEAPON_ORDER) do
+		local cfg = GameConfig.WEAPONS[name]
 		if cfg.Price and cfg.Price > 0 then
 			table.insert(list, { Name = name, Config = cfg })
 		end
 	end
-	table.sort(list, function(a, b)
-		local ra = GameConfig.RARITY[a.Config.Rarity]
-		local rb = GameConfig.RARITY[b.Config.Rarity]
-		if ra.Order ~= rb.Order then return ra.Order < rb.Order end
-		return a.Config.Price < b.Config.Price
-	end)
 	return list
 end
 local weaponList = buildWeaponList()
+
+local function damageText(config, headshot)
+	local damage = headshot and GameConfig.getHeadshotDamage(config) or config.Damage
+	if config.Pellets then
+		return string.format("%d x %d", damage, config.Pellets)
+	end
+	return tostring(damage)
+end
 
 -- Client-side state, refreshed via RemoteFunctions on open + RemoteEvents on change
 local coins = 0
@@ -108,7 +112,7 @@ tabLayout.Padding = UDim.new(0, 4)
 tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
 tabLayout.Parent = tabBar
 
-local TABS = { "All", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Demon" }
+local TABS = { "All", "Primary", "Secondary", "Common", "Uncommon", "Rare", "Epic", "Legendary" }
 local currentTab = "All"
 local tabButtons = {}
 
@@ -125,7 +129,7 @@ scroll.Parent = main
 local sc = Instance.new("UICorner") sc.CornerRadius = UDim.new(0, 6) sc.Parent = scroll
 
 local gridLayout = Instance.new("UIGridLayout")
-gridLayout.CellSize = UDim2.new(0, 200, 0, 110)
+gridLayout.CellSize = UDim2.new(0, 220, 0, 265)
 gridLayout.CellPadding = UDim2.new(0, 10, 0, 10)
 gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
 gridLayout.Parent = scroll
@@ -165,9 +169,23 @@ local function makeCard(weapon)
 	strip.BorderSizePixel = 0
 	strip.Parent = card
 
+	local viewport = Instance.new("ViewportFrame")
+	viewport.Name = "WeaponThumbnail"
+	viewport.Size = UDim2.new(1, -12, 0, 92)
+	viewport.Position = UDim2.new(0, 6, 0, 7)
+	viewport.BackgroundColor3 = Color3.fromRGB(11, 13, 17)
+	viewport.BackgroundTransparency = 0.1
+	viewport.BorderSizePixel = 0
+	viewport.Ambient = Color3.fromRGB(170, 175, 185)
+	viewport.LightColor = Color3.fromRGB(255, 248, 235)
+	viewport.LightDirection = Vector3.new(-1, -0.5, -1)
+	viewport.Parent = card
+	local vc = Instance.new("UICorner") vc.CornerRadius = UDim.new(0, 4) vc.Parent = viewport
+	WeaponVisuals.createViewport(viewport, weapon.Name, weapon.Config)
+
 	local nameLbl = Instance.new("TextLabel")
-	nameLbl.Size = UDim2.new(1, -10, 0, 26)
-	nameLbl.Position = UDim2.new(0, 5, 0, 8)
+	nameLbl.Size = UDim2.new(1, -10, 0, 24)
+	nameLbl.Position = UDim2.new(0, 5, 0, 101)
 	nameLbl.BackgroundTransparency = 1
 	nameLbl.Text = weapon.Name
 	nameLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -177,17 +195,34 @@ local function makeCard(weapon)
 
 	local subLbl = Instance.new("TextLabel")
 	subLbl.Size = UDim2.new(1, -10, 0, 16)
-	subLbl.Position = UDim2.new(0, 5, 0, 36)
+	subLbl.Position = UDim2.new(0, 5, 0, 127)
 	subLbl.BackgroundTransparency = 1
-	subLbl.Text = string.format("%s · %s", weapon.Config.Rarity, weapon.Config.Type)
+	subLbl.Text = string.format("%s · %s · %s", weapon.Config.Slot, weapon.Config.Rarity, weapon.Config.Type)
 	subLbl.TextColor3 = rarityCfg.Color
 	subLbl.TextScaled = true
 	subLbl.Font = Enum.Font.GothamMedium
 	subLbl.Parent = card
 
+	local function addStat(text, y, color)
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.new(1, -10, 0, 18)
+		label.Position = UDim2.new(0, 5, 0, y)
+		label.BackgroundTransparency = 1
+		label.Text = text
+		label.TextColor3 = color
+		label.TextScaled = true
+		label.Font = Enum.Font.GothamMedium
+		label.TextXAlignment = Enum.TextXAlignment.Left
+		label.Parent = card
+	end
+
+	addStat(string.format("FIRE INTERVAL  %.2fs", weapon.Config.FireRate), 150, Color3.fromRGB(210, 210, 215))
+	addStat("BODY DAMAGE  " .. damageText(weapon.Config, false), 171, Color3.fromRGB(225, 225, 225))
+	addStat("HEAD DAMAGE  " .. damageText(weapon.Config, true), 192, Color3.fromRGB(255, 90, 75))
+
 	local priceLbl = Instance.new("TextLabel")
 	priceLbl.Size = UDim2.new(0.5, -5, 0, 26)
-	priceLbl.Position = UDim2.new(0, 5, 0, 56)
+	priceLbl.Position = UDim2.new(0, 5, 0, 229)
 	priceLbl.BackgroundTransparency = 1
 	priceLbl.Text = string.format("%d 幣", weapon.Config.Price)
 	priceLbl.TextColor3 = Color3.fromRGB(255, 215, 0)
@@ -198,7 +233,7 @@ local function makeCard(weapon)
 
 	local buyBtn = Instance.new("TextButton")
 	buyBtn.Size = UDim2.new(0.5, -10, 0, 30)
-	buyBtn.Position = UDim2.new(0.5, 5, 0, 75)
+	buyBtn.Position = UDim2.new(0.5, 5, 0, 227)
 	buyBtn.Text = "BUY"
 	buyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 	buyBtn.TextScaled = true
@@ -263,7 +298,11 @@ local function applyTabFilter()
 	for _, weapon in ipairs(weaponList) do
 		local entry = cards[weapon.Name]
 		if entry then
-			entry.Frame.Visible = (currentTab == "All" or weapon.Config.Rarity == currentTab)
+			entry.Frame.Visible = (
+				currentTab == "All"
+				or weapon.Config.Slot == currentTab
+				or weapon.Config.Rarity == currentTab
+			)
 		end
 	end
 end
@@ -281,7 +320,8 @@ for i, tabName in ipairs(TABS) do
 	btn.Size = UDim2.new(0, 100, 1, 0)
 	btn.Text = tabName
 	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-	btn.TextScaled = true
+	btn.TextScaled = false
+	btn.TextSize = 18
 	btn.Font = Enum.Font.GothamBold
 	btn.BackgroundColor3 = (tabName == currentTab) and Color3.fromRGB(60, 60, 80) or Color3.fromRGB(30, 30, 40)
 	btn.LayoutOrder = i

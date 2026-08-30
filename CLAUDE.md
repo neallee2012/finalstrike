@@ -103,7 +103,8 @@ PvE 蒐集階段 (180秒) → PvP 淘汰賽 → 最後存活者獲勝。
 | GameEventsBootstrap | ServerScriptService | Script | runtime 建立 ReplicatedStorage.GameEvents Folder + RemoteEvents |
 | GameConfig | ReplicatedStorage | ModuleScript | 全域設定 (武器/敵人/經濟/任務) |
 | GameEvents | ReplicatedStorage | Folder (runtime) | 由 GameEventsBootstrap 建立，內含所有 RemoteEvent |
-| WeaponMeshes | ServerStorage | ModuleScript | 武器 3D 模型生成 (6 builders × 30 武器) |
+| WeaponVisuals | ReplicatedStorage | ModuleScript | 16 把單體 MeshPart 武器 + 商店 ViewportFrame 縮圖 |
+| WeaponMeshes | ServerStorage | ModuleScript | 將 WeaponVisuals 模型轉為可裝備 Tool |
 | HUDController | StarterPlayerScripts | LocalScript | HUD（HP/Ammo/Phase/Currency/KillFeed，放此處避免每次重生 clone 一份新 ScreenGui，issue #2）|
 | WeaponClient | StarterPlayerScripts | LocalScript | 射擊輸入 + 兩段瞄準 (#8) |
 | ShopController | StarterPlayerScripts | LocalScript | B 鍵開店 UI |
@@ -116,21 +117,22 @@ PvE 蒐集階段 (180秒) → PvP 淘汰賽 → 最後存活者獲勝。
 4. PvP — 玩家互相攻擊，淘汰不重生
 5. Match End — 宣布勝者，8 秒後回大廳
 
-## 武器系統（Sprint 8 — 30 武器商店）
-- 30 把武器分 6 個稀有度：Common (5) / Uncommon (5) / Rare (5) / Epic (6) / Legendary (5) / Demon (4)
-- DPS 倍率：Common 1.0x / Uncommon 1.25x / Rare 1.55x / Epic 1.95x / Legendary 2.40x / Demon 3.00x
-  - **Sprint 8b 計劃改為 1.0/1.15/1.30/1.50/1.70/1.90（CEO 決議 b，收斂付費差距）**
-- Type：Pistol / SMG / Rifle / Shotgun / Sniper / Knife / Minigun
-- 玩家經商店購買（CurrencyService.spend），STARTER_WEAPONS = ["Viper Mk1", "Fang Scout"]
+## 武器系統（16 武器商店）
+- 16 把武器分為 Primary (8) / Secondary (8)，每把都有獨立 `Style` 模型
+- 每把武器的主要外觀必須是單一、連續 MeshPart；禁止退回大量 Part 拼裝
+- 所有武器爆頭傷害 = 身體傷害 × 1.25，四捨五入為整數
+- 稀有度保留作商店色彩與排序；現行射擊間隔／身體傷害以核准的 16 武器數值表為準
+- Type：Pistol / SMG / Rifle / Shotgun / Sniper / Minigun
+- 玩家經商店購買（CurrencyService.spend），STARTER_WEAPONS = ["Phantom Ranger", "Viper Mk1"]
 - 武器掉落已移除（NPC drop 只剩 Ammo / Coin / Medkit）
 - 詳見 `workloads/04-weapon-system.yaml` + `workloads/13-shop-service.yaml` + `GameConfig.WEAPONS`
-- 命名範例：Viper Mk1 (Common), Wraith Scout (Uncommon), Phantom Apex (Epic), Hailstorm (Legendary Minigun), Wraith Abyss (Demon)
+- 命名範例：Viper Mk1、Wraith Longshot、Phantom Vanguard、Hailstorm LMG、Thunder Twin
 
 ## 經濟系統（Sprint 8 — 子彈幣）
 - 子彈幣（BulletCoins）持久化儲存：CurrencyService → DataStore PlayerCurrency_v1
 - 比賽中 anti-farming：MatchCaps（NpcKills 300 / Survival 200 / PlayerKills 600 / Total 1500）
 - Daily quest：6 個任務 + UTC midnight reset，獎勵 bypass match cap（DailyQuestService）
-- 武器商店：30 把武器，價格 300（Viper Mk1）→ 55,000（Thunder Bloodmoon Demon）（ShopService）
+- 武器商店：16 把武器，價格 300（Viper Mk1）→ 18,000（Hailstorm LMG）（ShopService）
 
 ## NPC 類型
 - Patrol: 60 HP, 低傷害, 基本戰利品
@@ -146,6 +148,7 @@ _隨開發進度持續更新_
 - R15 NPC 不要自己手刻 — 用 `Players:CreateHumanoidModelFromDescription(desc, Enum.HumanoidRigType.R15)` 直接拿完整 character mesh + Motor6D + Animate LocalScript + BodyColors + 預設 HipHeight 2.19。手刻 16 Part + Motor6D 是 Sprint 5 踩過的 C0/C1 反向陷阱
 - 角色掛武器：用 `Tool` 不要手刻 Motor6D。Tool 直接 parent 到 Character 會 auto-equip + tool-hold 動畫 + Tool.Grip 自動算 grip pose
 - Tool.Grip 預設讓 Handle 的 `-Z` 方向對齊 hand 前向，所以武器 mesh 設計時把 muzzle attachment 放 Handle 的 -Z 端，`Tool.Grip = CFrame.new(0, +halfGripHeight, 0)` 就夠用，不需自己加旋轉
+- AI 生成的 16 把單體網格原生槍口朝 Handle `+Z`；WeaponMeshes 與 FirstPersonViewmodel 固定旋轉 Y=180°，Muzzle 也必須放在 local `+Z`，不可沿用舊 Part 模型的 `-Z` 假設，否則對戰畫面會整把反向
 - Tool 持槍要設 `CanBeDropped = false` + `ManualActivationOnly = true`，不然玩家會丟槍或觸發 default click 行為
 - HumanoidDescription.Shirt / Pants 只認 classic 2D Shirt/Pants asset type；creator store 多數結果是 layered clothing 3D model，餵進去會 fallback 到預設 template，3 種 NPC 看起來都穿同一件。視覺差異化用 programmatic accessories（Part + WeldConstraint 掛 Head/UpperTorso）反而更可控
 - `execute_luau` 在 playtest 是 client context — 看不到 ServerScriptService 子物件、`_G` 也是 client 的、設 Part 屬性也不會 replicate 給 server。驗證 server 狀態靠 `print` + `console_output`；要操控 server 狀態靠既有 RemoteEvent 鏈或臨時加 server-side debug 入口

@@ -49,6 +49,13 @@ R15Pose.Poses = {
 		LeftElbow = angles(60, 0, 59),
 		LeftWrist = angles(46, 3, -65),
 	},
+	WraithLongshotHold = {
+		RightShoulder = angles(-6, -23, -9),
+		RightElbow = angles(1, -25, -54),
+		LeftShoulder = angles(36.5, -104, 15),
+		LeftElbow = angles(71.5, 7.5, -11.5),
+		LeftWrist = angles(46, 3, -65),
+	},
 	NPCAim = {
 		RightShoulder = angles(-75, 0, 5),
 		RightElbow = angles(-15, 0, 0),
